@@ -1,4 +1,3 @@
-"""Main application entry point."""
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -10,7 +9,7 @@ from infrastructure.cache import init_redis, close_redis
 from infrastructure.database import init_database, close_database
 from infrastructure.knowledge_graph import init_neo4j, close_neo4j
 from infrastructure.vector_db import init_milvus, close_milvus
-from presentation.api.v1 import api_router
+from api.v1 import api_router
 
 # Setup logging
 setup_logging()
@@ -19,25 +18,11 @@ logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager."""
-    # Startup
     logger.info("Starting MediXLM application...")
-
     try:
-        # Initialize database
-        logger.info("Initializing database...")
         await init_database()
-
-        # Initialize Redis cache
-        logger.info("Initializing Redis cache...")
         await init_redis()
-
-        # Initialize Neo4j knowledge graph
-        logger.info("Initializing Neo4j knowledge graph...")
         await init_neo4j()
-
-        # Initialize Milvus vector database
-        logger.info("Initializing Milvus vector database...")
         await init_milvus()
 
         logger.info("MediXLM application started successfully!")
@@ -47,8 +32,6 @@ async def lifespan(app: FastAPI):
         raise
 
     yield
-
-    # Shutdown
     logger.info("Shutting down MediXLM application...")
 
     try:
@@ -58,20 +41,46 @@ async def lifespan(app: FastAPI):
         await close_milvus()
 
         logger.info("MediXLM application shutdown successfully!")
-
     except Exception as e:
         logger.error(f"Error during shutdown: {str(e)}")
 
 
-# Create FastAPI application
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Medical AI Chatbot with Knowledge Graph",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+    contact={
+        "name": "MediXLM Team",
+        "email": "support@medixlm.com",
+    },
+    license_info={
+        "name": "MIT License",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    terms_of_service="https://medixlm.com/terms",
+    openapi_tags=[
+        {
+            "name": "health",
+            "description": "Health check and system status endpoints",
+        },
+        {
+            "name": "chat",
+            "description": "Chat operations including message processing and conversation history",
+        },
+        {
+            "name": "knowledge",
+            "description": "Medical knowledge graph operations including CRUD, search, and relationships",
+        },
+        {
+            "name": "users",
+            "description": "User management operations",
+        },
+    ],
 )
 
-# Setup CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -80,7 +89,6 @@ app.add_middleware(
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
-# Include API routers
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 

@@ -1,4 +1,4 @@
-"""Redis client management."""
+"""Redis client management for Upstash Cloud."""
 import json
 from typing import Optional
 
@@ -11,16 +11,21 @@ redis_client: Optional[redis.Redis] = None
 
 
 async def init_redis():
-    """Initialize Redis connection."""
+    """Initialize Redis connection to Upstash Cloud.
+
+    Uses REDIS_URL format: rediss://default:password@host:port
+    Upstash provides secure Redis with TLS (rediss://)
+    """
     global redis_client
 
-    redis_client = redis.Redis(
-        host=settings.REDIS_HOST,
-        port=settings.REDIS_PORT,
-        db=settings.REDIS_DB,
-        password=settings.REDIS_PASSWORD if settings.REDIS_PASSWORD else None,
+    # Connect using URL (supports Upstash format with TLS)
+    redis_client = redis.from_url(
+        settings.REDIS_URL,
         decode_responses=True,
         max_connections=settings.REDIS_MAX_CONNECTIONS,
+        socket_connect_timeout=5,
+        socket_keepalive=True,
+        health_check_interval=30,
     )
 
     # Test connection

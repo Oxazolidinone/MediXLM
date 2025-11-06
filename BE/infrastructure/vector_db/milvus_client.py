@@ -7,17 +7,20 @@ _collection: Optional[Collection] = None
 
 
 async def init_milvus():
+    """Initialize Milvus cloud connection."""
     global _collection
 
+    # Connect to Milvus Cloud using URI and token
     connections.connect(
         alias="default",
-        host=settings.MILVUS_HOST,
-        port=settings.MILVUS_PORT,
+        uri=settings.MILVUS_URI,
+        token=settings.MILVUS_TOKEN,
     )
 
     collection_name = settings.MILVUS_COLLECTION_NAME
 
     if not utility.has_collection(collection_name):
+        # Create collection schema
         fields = [
             FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
             FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=settings.EMBEDDING_DIMENSION),
@@ -27,6 +30,7 @@ async def init_milvus():
         schema = CollectionSchema(fields=fields, description="Medical knowledge embeddings")
         _collection = Collection(name=collection_name, schema=schema)
 
+        # Create index for vector similarity search
         index_params = {
             "metric_type": "COSINE",
             "index_type": "IVF_FLAT",

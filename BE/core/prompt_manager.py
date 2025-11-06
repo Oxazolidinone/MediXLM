@@ -33,50 +33,6 @@ class PromptManager:
         
         return template
 
-    def get_embedding_prompt(self, name: str, description: Optional[str] = None) -> str:
-        return self.format_prompt(
-            "embedding_generation",
-            name=name,
-            description=description or ""
-        )
-
-    def get_search_prompt(self, query: str, knowledge_type: Optional[str] = None, limit: int = 10) -> str:
-        return self.format_prompt(
-            "knowledge_search",
-            query=query,
-            knowledge_type=knowledge_type or "All types",
-            limit=limit
-        )
-
-    def get_validation_prompt(self, name: str, knowledge_type: str, description: Optional[str] = None, source: Optional[str] = None, properties: Optional[Dict[str, Any]] = None) -> str:
-        return self.format_prompt(
-            "knowledge_validation",
-            name=name,
-            knowledge_type=knowledge_type,
-            description=description or "N/A",
-            source=source or "N/A",
-            properties=properties or {}
-        )
-
-    def get_relationship_prompt(self, source_name: str, source_id: str, target_name: str, target_id: str, relationship_type: str) -> str:
-        return self.format_prompt(
-            "relationship_extraction",
-            source_name=source_name,
-            source_id=source_id,
-            target_name=target_name,
-            target_id=target_id,
-            relationship_type=relationship_type
-        )
-
-    def get_related_analysis_prompt(self, node_name: str, node_id: str, relationship_type: Optional[str] = None, depth: int = 1) -> str:
-        return self.format_prompt(
-            "related_knowledge_analysis",
-            node_name=node_name,
-            node_id=node_id,
-            relationship_type=relationship_type or "All types",
-            depth=depth
-        )
-
     def clear_cache(self):
         self.load_prompt.cache_clear()
         self._template_cache.clear()

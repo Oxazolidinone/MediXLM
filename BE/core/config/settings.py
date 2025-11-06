@@ -24,22 +24,18 @@ class Settings(BaseSettings):
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
 
-    # Redis Cache
-    REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
-    REDIS_DB: int = 0
-    REDIS_PASSWORD: Optional[str] = None
+    # Redis Cache (Upstash Cloud)
+    REDIS_URL: str = "rediss://default:password@your-redis.upstash.io:6379"
     REDIS_MAX_CONNECTIONS: int = 50
 
-    # Neo4j Knowledge Graph
-    NEO4J_URI: str = "bolt://localhost:7687"
+    # Neo4j Knowledge Graph (Aura Cloud)
+    NEO4J_URI: str = "neo4j+s://xxxxxxxx.databases.neo4j.io"
     NEO4J_USER: str = "neo4j"
     NEO4J_PASSWORD: str = "password"
-    NEO4J_MAX_POOL_SIZE: int = 50
 
-    # Milvus Vector Database
-    MILVUS_HOST: str = "localhost"
-    MILVUS_PORT: int = 19530
+    # Milvus Vector Database (Cloud)
+    MILVUS_URI: str = "https://your-instance.api.gcp-us-west1.zillizcloud.com"
+    MILVUS_TOKEN: Optional[str] = None
     MILVUS_COLLECTION_NAME: str = "medical_knowledge"
 
     # Local LLM (HuggingFace models)

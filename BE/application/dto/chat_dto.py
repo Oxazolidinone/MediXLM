@@ -1,4 +1,3 @@
-"""Chat DTOs."""
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 from uuid import UUID
