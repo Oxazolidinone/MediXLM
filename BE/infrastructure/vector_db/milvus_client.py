@@ -1,18 +1,14 @@
-"""Milvus client for vector search."""
 from typing import Optional
 from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
 
 from core.config import settings
 
-# Global collection reference
 _collection: Optional[Collection] = None
 
 
 async def init_milvus():
-    """Initialize Milvus connection and collection."""
     global _collection
 
-    # Connect to Milvus
     connections.connect(
         alias="default",
         host=settings.MILVUS_HOST,
@@ -21,7 +17,6 @@ async def init_milvus():
 
     collection_name = settings.MILVUS_COLLECTION_NAME
 
-    # Create collection if not exists
     if not utility.has_collection(collection_name):
         fields = [
             FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
@@ -32,7 +27,6 @@ async def init_milvus():
         schema = CollectionSchema(fields=fields, description="Medical knowledge embeddings")
         _collection = Collection(name=collection_name, schema=schema)
 
-        # Create index
         index_params = {
             "metric_type": "COSINE",
             "index_type": "IVF_FLAT",
@@ -46,7 +40,6 @@ async def init_milvus():
 
 
 async def close_milvus():
-    """Close Milvus connection."""
     global _collection
     if _collection:
         _collection.release()
@@ -54,7 +47,6 @@ async def close_milvus():
 
 
 def get_milvus_client() -> Collection:
-    """Get Milvus collection."""
     if _collection is None:
         raise RuntimeError("Milvus not initialized. Call init_milvus() first.")
     return _collection

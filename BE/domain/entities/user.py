@@ -1,4 +1,3 @@
-"""User entity."""
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
@@ -7,8 +6,6 @@ from uuid import UUID, uuid4
 
 @dataclass
 class User:
-    """User domain entity."""
-
     id: UUID
     username: str
     email: str
@@ -25,7 +22,6 @@ class User:
 
     @staticmethod
     def create(username: str, email: str, full_name: Optional[str] = None) -> "User":
-        """Create a new user."""
         return User(
             id=uuid4(),
             username=username,
@@ -34,7 +30,6 @@ class User:
         )
 
     def update_profile(self, full_name: Optional[str] = None, email: Optional[str] = None):
-        """Update user profile."""
         if full_name:
             self.full_name = full_name
         if email:
@@ -42,6 +37,5 @@ class User:
         self.updated_at = datetime.utcnow()
 
     def deactivate(self):
-        """Deactivate user."""
         self.is_active = False
         self.updated_at = datetime.utcnow()

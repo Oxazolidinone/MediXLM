@@ -3,19 +3,14 @@ from typing import List, Dict, Any, Optional
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from threading import Thread
-
-from application.interfaces import ILLMService
 from core.config import settings
 
 
-class LocalLLMService(ILLMService):
-    """Local LLM service using HuggingFace transformers."""
-
+class LLMService():
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model_name = settings.LLM_MODEL_NAME
 
-        # Load tokenizer and model
         self.tokenizer = AutoTokenizer.from_pretrained(
             self.model_name,
             trust_remote_code=True
@@ -35,7 +30,6 @@ class LocalLLMService(ILLMService):
         self.model.eval()
 
     def _format_messages(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
-        """Format messages into prompt string."""
         prompt_parts = []
 
         if system_prompt:
@@ -49,41 +43,6 @@ class LocalLLMService(ILLMService):
         prompt_parts.append("Assistant:")
         return "\n".join(prompt_parts)
 
-    async def generate_response(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Generate response from local LLM."""
-
-        prompt = self._format_messages(messages, system_prompt)
-
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=max_tokens or settings.LLM_MAX_TOKENS,
-                temperature=temperature,
-                do_sample=True,
-                top_p=0.9,
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
-
-        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-        # Extract only the assistant's response
-        response = response[len(prompt):].strip()
-
-        return {
-            "content": response,
-            "tokens_used": len(outputs[0]),
-            "model": self.model_name,
-            "finish_reason": "stop",
-        }
-
     async def generate_streaming_response(
         self,
         messages: List[Dict[str, str]],
@@ -91,8 +50,6 @@ class LocalLLMService(ILLMService):
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
     ):
-        """Generate streaming response from local LLM."""
-
         prompt = self._format_messages(messages, system_prompt)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
 
@@ -117,3 +74,12 @@ class LocalLLMService(ILLMService):
 
         for text in streamer:
             yield text
+
+    async def generate_embeddings(self, text: str) -> List[float]:
+        embedding = self.model.encode(text, convert_to_numpy=True, show_progress_bar=False)
+        return embedding.tolist()
+
+    async def generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
+        embeddings = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False, batch_size=32)
+        return embeddings.tolist()
+

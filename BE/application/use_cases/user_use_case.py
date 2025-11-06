@@ -9,15 +9,10 @@ from core.exceptions import UserAlreadyExistsError, UserNotFoundError
 
 
 class UserUseCase:
-    """User use case for managing users."""
-
     def __init__(self, user_repository: IUserRepository):
         self.user_repo = user_repository
 
     async def create_user(self, user_data: UserCreateDTO) -> UserResponseDTO:
-        """Create a new user."""
-
-        # Check if user already exists
         existing_user = await self.user_repo.get_by_username(user_data.username)
         if existing_user:
             raise UserAlreadyExistsError(f"Username {user_data.username} already exists")

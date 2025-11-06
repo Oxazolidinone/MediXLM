@@ -2,35 +2,19 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from application.interfaces import IEmbeddingService
+from BE.infrastructure.services import LLMService
 from domain.entities import MedicalKnowledge
 from domain.entities.medical_knowledge import KnowledgeType
-from domain.repositories import IKnowledgeGraphRepository
+from domain.repositories import KnowledgeGraphRepository
 from core.exceptions import KnowledgeNotFoundError
 
 
 class KnowledgeUseCase:
-    """Knowledge use case for managing medical knowledge graph."""
-
-    def __init__(
-        self,
-        knowledge_graph_repository: IKnowledgeGraphRepository,
-        embedding_service: IEmbeddingService,
-    ):
+    def __init__( self, knowledge_graph_repository: KnowledgeGraphRepository, embedding_service: LLMService):
         self.kg_repo = knowledge_graph_repository
         self.embedding_service = embedding_service
 
-    async def add_knowledge(
-        self,
-        name: str,
-        knowledge_type: KnowledgeType,
-        description: Optional[str] = None,
-        properties: Optional[Dict[str, Any]] = None,
-        source: Optional[str] = None,
-    ) -> MedicalKnowledge:
-        """Add new medical knowledge to the graph."""
-
-        # Create knowledge entity
+    async def add_knowledge(self, name: str, knowledge_type: KnowledgeType, description: Optional[str] = None, properties: Optional[Dict[str, Any]] = None, source: Optional[str] = None) -> MedicalKnowledge:
         knowledge = MedicalKnowledge.create(
             name=name,
             knowledge_type=knowledge_type,

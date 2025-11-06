@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 
 class KnowledgeType(str, Enum):
-    """Knowledge type enumeration."""
     DISEASE = "disease"
     SYMPTOM = "symptom"
     TREATMENT = "treatment"
@@ -19,8 +18,6 @@ class KnowledgeType(str, Enum):
 
 @dataclass
 class MedicalKnowledge:
-    """Medical Knowledge domain entity for Knowledge Graph nodes."""
-
     id: UUID
     name: str
     knowledge_type: KnowledgeType
@@ -49,7 +46,6 @@ class MedicalKnowledge:
         source: Optional[str] = None,
         confidence_score: float = 1.0
     ) -> "MedicalKnowledge":
-        """Create a new medical knowledge entity."""
         return MedicalKnowledge(
             id=uuid4(),
             name=name,
@@ -61,11 +57,9 @@ class MedicalKnowledge:
         )
 
     def update_embeddings(self, embeddings: List[float]):
-        """Update embeddings for vector search."""
         self.embeddings = embeddings
         self.updated_at = datetime.utcnow()
 
     def update_properties(self, properties: Dict[str, Any]):
-        """Update knowledge properties."""
         self.properties.update(properties)
         self.updated_at = datetime.utcnow()

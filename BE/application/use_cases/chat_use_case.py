@@ -1,33 +1,24 @@
-"""Chat use case."""
-from typing import Optional, List, Dict, Any
+from typing import List, Dict
 from uuid import UUID
 
 from application.dto import ChatRequestDTO, ChatResponseDTO, MessageDTO
-from application.interfaces import ILLMService, IEmbeddingService
+from BE.infrastructure.services import LLMService
 from domain.entities import Conversation, Message, MessageRole
 from domain.repositories import (
     IConversationRepository,
     IKnowledgeGraphRepository,
     ICacheRepository,
 )
-from core.exceptions import ConversationNotFoundError, UserNotFoundError
+from core.exceptions import ConversationNotFoundError
 from core.prompts import build_chat_prompt, format_knowledge_context
 
 
 class ChatUseCase:
-    def __init__(
-        self,
-        conversation_repository: IConversationRepository,
-        knowledge_graph_repository: IKnowledgeGraphRepository,
-        cache_repository: ICacheRepository,
-        llm_service: ILLMService,
-        embedding_service: IEmbeddingService,
-    ):
+    def __init__(self, conversation_repository: IConversationRepository, knowledge_graph_repository: IKnowledgeGraphRepository, cache_repository: ICacheRepository, llm_service: LLMService):
         self.conversation_repo = conversation_repository
         self.kg_repo = knowledge_graph_repository
         self.cache_repo = cache_repository
         self.llm_service = llm_service
-        self.embedding_service = embedding_service
 
     async def process_message(self, request: ChatRequestDTO) -> ChatResponseDTO:
         # Get or create conversation
@@ -48,7 +39,7 @@ class ChatUseCase:
         await self.conversation_repo.add_message(user_message)
 
         # Generate embeddings for semantic search
-        embeddings = await self.embedding_service.generate_embeddings(request.message)
+        embeddings = await self.llm_service.embeddings([request.message])
 
         # Search knowledge graph for relevant medical information
         related_knowledge = await self.kg_repo.similarity_search(
@@ -60,7 +51,7 @@ class ChatUseCase:
         knowledge_context = self._build_knowledge_context(related_knowledge)
 
         # Get conversation history
-        messages = await self.conversation_repo.get_messages(conversation.id, limit=10)
+        messages = await self.conversation_repo.get_messages(conversation.id, limit=4)
         conversation_history = self._build_conversation_history(messages)
 
         # Generate LLM response
@@ -68,7 +59,7 @@ class ChatUseCase:
         llm_response = await self.llm_service.generate_response(
             messages=conversation_history + [{"role": "user", "content": request.message}],
             system_prompt=system_prompt,
-            temperature=0.7,
+            temperature=0.2,
         )
 
         # Save assistant message
@@ -101,7 +92,6 @@ class ChatUseCase:
         )
 
     def _build_knowledge_context(self, knowledge_list) -> str:
-        """Build context from knowledge graph."""
         knowledge_items = [
             {
                 "name": k.name,
@@ -113,24 +103,16 @@ class ChatUseCase:
         return format_knowledge_context(knowledge_items)
 
     def _build_conversation_history(self, messages: List[Message]) -> List[Dict[str, str]]:
-        """Build conversation history for LLM."""
         return [
             {"role": msg.role.value, "content": msg.content}
-            for msg in messages[:-1]  # Exclude the last message (current user message)
+            for msg in messages[:-1] 
         ]
 
     def _build_system_prompt(self, knowledge_context: str) -> str:
-        """Build system prompt with knowledge context."""
         return build_chat_prompt(knowledge_context if knowledge_context else None)
 
-    async def get_conversation_history(
-        self, conversation_id: UUID, skip: int = 0, limit: int = 50
-    ) -> List[MessageDTO]:
-        """Get conversation history."""
-        messages = await self.conversation_repo.get_messages(
-            conversation_id, skip=skip, limit=limit
-        )
-
+    async def get_conversation_history( self, conversation_id: UUID, skip: int = 0, limit: int = 50) -> List[MessageDTO]:
+        messages = await self.conversation_repo.get_messages(conversation_id, skip=skip, limit=limit)
         return [
             MessageDTO(
                 id=msg.id,

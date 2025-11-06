@@ -10,7 +10,6 @@ neo4j_driver: Optional[AsyncDriver] = None
 
 
 async def init_neo4j():
-    """Initialize Neo4j connection."""
     global neo4j_driver
 
     neo4j_driver = AsyncGraphDatabase.driver(
@@ -18,13 +17,10 @@ async def init_neo4j():
         auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
         max_connection_pool_size=settings.NEO4J_MAX_POOL_SIZE,
     )
-
-    # Verify connection
     await neo4j_driver.verify_connectivity()
 
 
 async def close_neo4j():
-    """Close Neo4j connection."""
     global neo4j_driver
     if neo4j_driver:
         await neo4j_driver.close()

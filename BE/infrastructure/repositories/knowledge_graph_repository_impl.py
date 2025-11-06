@@ -10,13 +10,10 @@ from domain.repositories import IKnowledgeGraphRepository
 
 
 class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
-    """Knowledge Graph repository implementation using Neo4j."""
-
     def __init__(self, driver: AsyncDriver):
         self.driver = driver
 
     async def create_node(self, knowledge: MedicalKnowledge) -> MedicalKnowledge:
-        """Create a new knowledge node."""
         query = """
         CREATE (n:MedicalKnowledge {
             id: $id,
@@ -52,7 +49,6 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
         return knowledge
 
     async def get_node_by_id(self, node_id: UUID) -> Optional[MedicalKnowledge]:
-        """Get knowledge node by ID."""
         query = """
         MATCH (n:MedicalKnowledge {id: $id})
         RETURN n
@@ -66,10 +62,7 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
                 return self._to_entity(record["n"])
             return None
 
-    async def search_by_name(
-        self, name: str, knowledge_type: Optional[KnowledgeType] = None
-    ) -> List[MedicalKnowledge]:
-        """Search knowledge nodes by name."""
+    async def search_by_name(self, name: str, knowledge_type: Optional[KnowledgeType] = None) -> List[MedicalKnowledge]:    
         if knowledge_type:
             query = """
             MATCH (n:MedicalKnowledge)
@@ -93,14 +86,7 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
 
             return [self._to_entity(record[0]) for record in records]
 
-    async def create_relationship(
-        self,
-        source_id: UUID,
-        target_id: UUID,
-        relationship_type: str,
-        properties: Optional[Dict[str, Any]] = None,
-    ) -> bool:
-        """Create relationship between two knowledge nodes."""
+    async def create_relationship(self, source_id: UUID, target_id: UUID, relationship_type: str, properties: Optional[Dict[str, Any]] = None) -> bool:
         query = """
         MATCH (source:MedicalKnowledge {id: $source_id})
         MATCH (target:MedicalKnowledge {id: $target_id})
@@ -118,13 +104,7 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
             record = await result.single()
             return record is not None
 
-    async def get_related_nodes(
-        self,
-        node_id: UUID,
-        relationship_type: Optional[str] = None,
-        depth: int = 1,
-    ) -> List[MedicalKnowledge]:
-        """Get related knowledge nodes."""
+    async def get_related_nodes(self, node_id: UUID, relationship_type: Optional[str] = None, depth: int = 1) -> List[MedicalKnowledge]:
         if relationship_type:
             query = """
             MATCH (n:MedicalKnowledge {id: $id})-[r:%s*1..%d]-(related:MedicalKnowledge)
@@ -142,15 +122,7 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
 
             return [self._to_entity(record[0]) for record in records]
 
-    async def similarity_search(
-        self,
-        embeddings: List[float],
-        knowledge_type: Optional[KnowledgeType] = None,
-        limit: int = 10,
-    ) -> List[MedicalKnowledge]:
-        """Perform vector similarity search."""
-        # Note: This requires a vector index in Neo4j
-        # For now, we'll use a simplified implementation
+    async def similarity_search(self, embeddings: List[float], knowledge_type: Optional[KnowledgeType] = None, limit: int = 10) -> List[MedicalKnowledge]:
         if knowledge_type:
             query = """
             MATCH (n:MedicalKnowledge {knowledge_type: $knowledge_type})
@@ -181,7 +153,6 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
             return [self._to_entity(record[0]) for record in records]
 
     async def update_node(self, knowledge: MedicalKnowledge) -> MedicalKnowledge:
-        """Update knowledge node."""
         query = """
         MATCH (n:MedicalKnowledge {id: $id})
         SET n.name = $name,
@@ -213,7 +184,6 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
         return knowledge
 
     async def delete_node(self, node_id: UUID) -> bool:
-        """Delete knowledge node."""
         query = """
         MATCH (n:MedicalKnowledge {id: $id})
         DETACH DELETE n
@@ -227,7 +197,6 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
 
     @staticmethod
     def _to_entity(node) -> MedicalKnowledge:
-        """Convert Neo4j node to entity."""
         from datetime import datetime
 
         return MedicalKnowledge(

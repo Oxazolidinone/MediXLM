@@ -1,35 +1,14 @@
-"""Prompt templates for medical assistant."""
 from pathlib import Path
 from typing import Optional
 
-# Base directory for prompt files
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 
 
 def load_system_prompt() -> str:
-    """Load the main system prompt."""
     prompt_file = PROMPTS_DIR / "system_prompt.txt"
-    if prompt_file.exists():
-        return prompt_file.read_text(encoding="utf-8")
-    return get_default_system_prompt()
-
-
-def get_default_system_prompt() -> str:
-    """Get default system prompt if file doesn't exist."""
-    return """You are MediXLM, an AI medical assistant providing accurate, evidence-based medical information.
-
-IMPORTANT:
-- Base answers on the provided medical knowledge
-- Acknowledge uncertainty when information is limited
-- Recommend consulting healthcare professionals for diagnoses and treatment
-- Never provide definitive diagnoses or prescribe medications
-- Use clear, empathetic language
-
-If patient describes emergency symptoms (chest pain, difficulty breathing, stroke signs, severe bleeding, suicidal thoughts), immediately recommend emergency care."""
-
+    return prompt_file.read_text(encoding="utf-8")
 
 def build_chat_prompt(knowledge_context: Optional[str] = None) -> str:
-    """Build chat prompt with optional knowledge context."""
     base_prompt = load_system_prompt()
 
     if knowledge_context:

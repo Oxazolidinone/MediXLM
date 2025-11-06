@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 
 class MessageRole(str, Enum):
-    """Message role enumeration."""
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
@@ -15,8 +14,6 @@ class MessageRole(str, Enum):
 
 @dataclass
 class Message:
-    """Message domain entity."""
-
     id: UUID
     conversation_id: UUID
     role: MessageRole
@@ -32,14 +29,7 @@ class Message:
             self.metadata = {}
 
     @staticmethod
-    def create(
-        conversation_id: UUID,
-        role: MessageRole,
-        content: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        tokens_used: Optional[int] = None
-    ) -> "Message":
-        """Create a new message."""
+    def create( conversation_id: UUID, role: MessageRole, content: str, metadata: Optional[Dict[str, Any]] = None, tokens_used: Optional[int] = None) -> "Message":
         return Message(
             id=uuid4(),
             conversation_id=conversation_id,
@@ -50,7 +40,6 @@ class Message:
         )
 
     def add_metadata(self, key: str, value: Any):
-        """Add metadata to message."""
         if self.metadata is None:
             self.metadata = {}
         self.metadata[key] = value

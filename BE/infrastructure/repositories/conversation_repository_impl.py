@@ -12,8 +12,6 @@ from infrastructure.database.models import ConversationModel, MessageModel
 
 
 class ConversationRepositoryImpl(IConversationRepository):
-    """Conversation repository implementation using SQLAlchemy."""
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
