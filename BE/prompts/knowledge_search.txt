@@ -1,0 +1,27 @@
+Medical Knowledge Search Query Optimization
+
+User Query: {query}
+Knowledge Type Filter: {knowledge_type}
+Search Limit: {limit}
+
+Instructions:
+1. Analyze the user's medical query intent
+2. Extract key medical concepts and terminology
+3. Generate embeddings that capture:
+   - Primary medical concepts
+   - Related symptoms or conditions
+   - Treatment modalities
+   - Diagnostic criteria
+4. Perform similarity search in the knowledge graph
+5. Rank results by relevance and confidence score
+
+Expected Output:
+- List of medical knowledge nodes
+- Relevance scores
+- Knowledge types (disease, symptom, treatment, etc.)
+- Associated properties and metadata
+
+Search Strategy:
+- Semantic similarity matching
+- Medical ontology awareness
+- Context-aware ranking

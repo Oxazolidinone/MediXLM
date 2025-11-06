@@ -1,0 +1,96 @@
+"""User use case."""
+from typing import Optional
+from uuid import UUID
+
+from application.dto import UserCreateDTO, UserResponseDTO
+from domain.entities import User
+from domain.repositories import IUserRepository
+from core.exceptions import UserAlreadyExistsError, UserNotFoundError
+
+
+class UserUseCase:
+    """User use case for managing users."""
+
+    def __init__(self, user_repository: IUserRepository):
+        self.user_repo = user_repository
+
+    async def create_user(self, user_data: UserCreateDTO) -> UserResponseDTO:
+        """Create a new user."""
+
+        # Check if user already exists
+        existing_user = await self.user_repo.get_by_username(user_data.username)
+        if existing_user:
+            raise UserAlreadyExistsError(f"Username {user_data.username} already exists")
+
+        existing_email = await self.user_repo.get_by_email(user_data.email)
+        if existing_email:
+            raise UserAlreadyExistsError(f"Email {user_data.email} already exists")
+
+        # Create user entity
+        user = User.create(
+            username=user_data.username,
+            email=user_data.email,
+            full_name=user_data.full_name,
+        )
+
+        # Save to repository
+        created_user = await self.user_repo.create(user)
+
+        return UserResponseDTO(
+            id=created_user.id,
+            username=created_user.username,
+            email=created_user.email,
+            full_name=created_user.full_name,
+            created_at=created_user.created_at,
+            is_active=created_user.is_active,
+        )
+
+    async def get_user(self, user_id: UUID) -> UserResponseDTO:
+        """Get user by ID."""
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundError(f"User {user_id} not found")
+
+        return UserResponseDTO(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at,
+            is_active=user.is_active,
+        )
+
+    async def get_user_by_username(self, username: str) -> Optional[UserResponseDTO]:
+        """Get user by username."""
+        user = await self.user_repo.get_by_username(username)
+        if not user:
+            return None
+
+        return UserResponseDTO(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            full_name=user.full_name,
+            created_at=user.created_at,
+            is_active=user.is_active,
+        )
+
+    async def update_user_profile(
+        self, user_id: UUID, full_name: Optional[str] = None, email: Optional[str] = None
+    ) -> UserResponseDTO:
+        """Update user profile."""
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise UserNotFoundError(f"User {user_id} not found")
+
+        user.update_profile(full_name=full_name, email=email)
+        updated_user = await self.user_repo.update(user)
+
+        return UserResponseDTO(
+            id=updated_user.id,
+            username=updated_user.username,
+            email=updated_user.email,
+            full_name=updated_user.full_name,
+            created_at=updated_user.created_at,
+            is_active=updated_user.is_active,
+        )

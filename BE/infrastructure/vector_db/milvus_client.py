@@ -1,0 +1,60 @@
+"""Milvus client for vector search."""
+from typing import Optional
+from pymilvus import connections, Collection, FieldSchema, CollectionSchema, DataType, utility
+
+from core.config import settings
+
+# Global collection reference
+_collection: Optional[Collection] = None
+
+
+async def init_milvus():
+    """Initialize Milvus connection and collection."""
+    global _collection
+
+    # Connect to Milvus
+    connections.connect(
+        alias="default",
+        host=settings.MILVUS_HOST,
+        port=settings.MILVUS_PORT,
+    )
+
+    collection_name = settings.MILVUS_COLLECTION_NAME
+
+    # Create collection if not exists
+    if not utility.has_collection(collection_name):
+        fields = [
+            FieldSchema(name="id", dtype=DataType.VARCHAR, is_primary=True, max_length=100),
+            FieldSchema(name="embedding", dtype=DataType.FLOAT_VECTOR, dim=settings.EMBEDDING_DIMENSION),
+            FieldSchema(name="text", dtype=DataType.VARCHAR, max_length=65535),
+            FieldSchema(name="metadata", dtype=DataType.JSON),
+        ]
+        schema = CollectionSchema(fields=fields, description="Medical knowledge embeddings")
+        _collection = Collection(name=collection_name, schema=schema)
+
+        # Create index
+        index_params = {
+            "metric_type": "COSINE",
+            "index_type": "IVF_FLAT",
+            "params": {"nlist": 128}
+        }
+        _collection.create_index(field_name="embedding", index_params=index_params)
+    else:
+        _collection = Collection(name=collection_name)
+
+    _collection.load()
+
+
+async def close_milvus():
+    """Close Milvus connection."""
+    global _collection
+    if _collection:
+        _collection.release()
+    connections.disconnect(alias="default")
+
+
+def get_milvus_client() -> Collection:
+    """Get Milvus collection."""
+    if _collection is None:
+        raise RuntimeError("Milvus not initialized. Call init_milvus() first.")
+    return _collection

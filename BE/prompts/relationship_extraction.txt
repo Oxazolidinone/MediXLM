@@ -1,0 +1,33 @@
+Medical Knowledge Relationship Extraction
+
+Source Knowledge: {source_name} (ID: {source_id})
+Target Knowledge: {target_name} (ID: {target_id})
+Relationship Type: {relationship_type}
+
+Instructions:
+1. Identify the medical relationship between source and target
+2. Validate the relationship type is appropriate:
+   - TREATS: treatment → disease/symptom
+   - CAUSES: disease/condition → symptom
+   - DIAGNOSES: test/procedure → disease
+   - PREVENTS: preventive measure → disease
+   - INDICATES: symptom → disease
+   - CONTRAINDICATES: treatment ↔ condition
+   - INTERACTS_WITH: drug ↔ drug
+
+3. Extract relationship properties:
+   - Strength of association
+   - Clinical evidence level
+   - Frequency/prevalence
+   - Special conditions
+
+4. Verify medical validity:
+   - Evidence-based support
+   - Clinical guidelines compliance
+   - No contradictory relationships
+
+Output:
+- Validated relationship
+- Confidence score
+- Supporting evidence
+- Additional metadata
