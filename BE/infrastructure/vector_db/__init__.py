@@ -1,3 +1,3 @@
-from .milvus_client import get_milvus_client, init_milvus, close_milvus
+from .qdrant_client import get_qdrant_client, init_qdrant, close_qdrant
 
-__all__ = ["get_milvus_client", "init_milvus", "close_milvus"]
+__all__ = ["get_qdrant_client", "init_qdrant", "close_qdrant"]
