@@ -9,6 +9,7 @@ from infrastructure.cache import init_redis, close_redis
 from infrastructure.database import init_database, close_database
 from infrastructure.knowledge_graph import init_neo4j, close_neo4j
 from infrastructure.vector_db import init_milvus, close_milvus
+from infrastructure.vector_db import init_qdrant, close_qdrant
 from api.v1 import api_router
 
 # Setup logging
@@ -23,7 +24,7 @@ async def lifespan(app: FastAPI):
         await init_database()
         await init_redis()
         await init_neo4j()
-        await init_milvus()
+        await init_qdrant()
 
         logger.info("MediXLM application started successfully!")
 
@@ -38,7 +39,7 @@ async def lifespan(app: FastAPI):
         await close_database()
         await close_redis()
         await close_neo4j()
-        await close_milvus()
+        await close_qdrant()
 
         logger.info("MediXLM application shutdown successfully!")
     except Exception as e:

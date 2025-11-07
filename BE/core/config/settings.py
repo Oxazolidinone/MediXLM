@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     MILVUS_TOKEN: Optional[str] = None
     MILVUS_COLLECTION_NAME: str = "medical_knowledge"
 
+    QDRANT_URL = "https://<your-qdrant-endpoint>"
+    QDRANT_API_KEY = "<your-api-key>"
+    QDRANT_COLLECTION_NAME = "pubmedqa_vectors"
+    EMBEDDING_DIMENSION = 384
+
     # Local LLM (HuggingFace models)
     LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model
     LLM_MAX_TOKENS: int = 2000
