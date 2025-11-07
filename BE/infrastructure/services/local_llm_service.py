@@ -1,37 +1,21 @@
 """Local LLM service using transformers."""
 from typing import List, Dict, Any, Optional
-import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from threading import Thread
+import requests
 from core.config import settings
+from services.local_embedding_service import LocalEmbeddingService
 
 
-class LLMService():
+class LocalLLMService:
     def __init__(self):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model_name = settings.LLM_MODEL_NAME
-
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            self.model_name,
-            trust_remote_code=True
-        )
-
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_name,
-            torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-            device_map="auto" if self.device == "cuda" else None,
-            trust_remote_code=True,
-            low_cpu_mem_usage=True,
-        )
-
-        if self.device == "cpu":
-            self.model = self.model.to(self.device)
-
-        self.model.eval()
+        self.api_url = f"{settings.LLM_API_URL}/generate"
+        self.timeout = settings.LLM_TIMEOUT
+        self.embedding_service = LocalEmbeddingService() 
 
     def _format_messages(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
+        """Format multi-turn chat messages into a single prompt."""
         prompt_parts = []
-
         if system_prompt:
             prompt_parts.append(f"System: {system_prompt}\n")
 
@@ -50,36 +34,25 @@ class LLMService():
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
     ):
+        """Stream tokens from local vLLM API endpoint."""
         prompt = self._format_messages(messages, system_prompt)
-        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-
-        streamer = TextIteratorStreamer(
-            self.tokenizer,
-            skip_special_tokens=True,
-            skip_prompt=True,
-        )
-
-        generation_kwargs = {
-            **inputs,
-            "max_new_tokens": max_tokens or settings.LLM_MAX_TOKENS,
+        payload = {
+            "prompt": prompt,
             "temperature": temperature,
-            "do_sample": True,
-            "top_p": 0.9,
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "streamer": streamer,
+            "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
         }
 
-        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
-        thread.start()
+        with requests.post(self.api_url, json=payload, stream=True, timeout=self.timeout) as r:
+            for line in r.iter_lines():
+                if not line:
+                    continue
+            decoded = line.decode("utf-8")
+            if decoded.startswith("data: "):
+                yield decoded.replace("data: ", "")
 
-        for text in streamer:
-            yield text
 
-    async def generate_embeddings(self, text: str) -> List[float]:
-        embedding = self.model.encode(text, convert_to_numpy=True, show_progress_bar=False)
-        return embedding.tolist()
+    async def generate_embeddings(self, text: str):
+        return await self.embedding_service.generate_embedding(text)
 
-    async def generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
-        embeddings = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False, batch_size=32)
-        return embeddings.tolist()
-
+    async def generate_batch_embeddings(self, texts: List[str]):
+        return await self.embedding_service.generate_batch_embeddings(texts)

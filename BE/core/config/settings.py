@@ -38,9 +38,10 @@ class Settings(BaseSettings):
     MILVUS_TOKEN: Optional[str] = None
     MILVUS_COLLECTION_NAME: str = "medical_knowledge"
 
+    # Qdrant Vector Database (Cloud)
     QDRANT_URL = "https://<your-qdrant-endpoint>"
     QDRANT_API_KEY = "<your-api-key>"
-    QDRANT_COLLECTION_NAME = "pubmedqa_vectors"
+    QDRANT_COLLECTION_NAME = "medical_knowledge"
     EMBEDDING_DIMENSION = 384
 
     # Local LLM (HuggingFace models)
@@ -48,7 +49,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 2000
 
     # Local Embedding Model
-    EMBEDDING_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBEDDING_MODEL_NAME: str = "intfloat/e5-base-v2"
     EMBEDDING_DIMENSION: int = 384  # all-MiniLM-L6-v2 dimension
 
     # CORS
