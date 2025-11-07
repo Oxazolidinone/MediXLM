@@ -1,0 +1,108 @@
+Folder PATH listing
+Volume serial number is E07D-E813
+C:.
+|   .env.example
+|   .gitignore
+|   Dockerfile
+|   main.py
+|   requirements.txt
+|   structure.txt
+|   
++---api
+|   |   dependencies.py
+|   |   __init__.py
+|   |   
+|   \---v1
+|       |   __init__.py
+|       |   
+|       \---endpoints
+|               chat.py
+|               health.py
+|               knowledge.py
+|               users.py
+|               __init__.py
+|               
++---application
+|   |   __init__.py
+|   |   
+|   +---dto
+|   |       chat_dto.py
+|   |       conversation_dto.py
+|   |       user_dto.py
+|   |       __init__.py
+|   |       
+|   \---use_cases
+|           chat_use_case.py
+|           knowledge_use_case.py
+|           user_use_case.py
+|           __init__.py
+|           
++---core
+|   |   prompts.py
+|   |   prompt_manager.py
+|   |   __init__.py
+|   |   
+|   +---config
+|   |       settings.py
+|   |       __init__.py
+|   |       
+|   +---exceptions
+|   |       __init__.py
+|   |       
+|   \---logging
+|           logger.py
+|           __init__.py
+|           
++---domain
+|   |   __init__.py
+|   |   
+|   +---entities
+|   |       conversation.py
+|   |       medical_knowledge.py
+|   |       message.py
+|   |       user.py
+|   |       __init__.py
+|   |       
+|   \---repositories
+|           cache_repository.py
+|           conversation_repository.py
+|           knowledge_graph_repository.py
+|           user_repository.py
+|           __init__.py
+|           
++---infrastructure
+|   |   __init__.py
+|   |   
+|   +---cache
+|   |       redis_client.py
+|   |       __init__.py
+|   |       
+|   +---database
+|   |       connection.py
+|   |       models.py
+|   |       __init__.py
+|   |       
+|   +---knowledge_graph
+|   |       neo4j_client.py
+|   |       __init__.py
+|   |       
+|   +---repositories
+|   |       cache_repository_impl.py
+|   |       conversation_repository_impl.py
+|   |       knowledge_graph_repository_impl.py
+|   |       user_repository_impl.py
+|   |       __init__.py
+|   |       
+|   +---services
+|   |       local_embedding_service.py
+|   |       local_llm_service.py
+|   |       __init__.py
+|   |       
+|   \---vector_db
+|           milvus_client.py
+|           qdrant_client.py
+|           __init__.py
+|           
+\---prompts
+        system_prompt.txt
+        

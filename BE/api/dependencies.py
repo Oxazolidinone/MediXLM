@@ -85,7 +85,6 @@ def get_chat_use_case(
     kg_repo: IKnowledgeGraphRepository = Depends(get_knowledge_graph_repository),
     cache_repo: ICacheRepository = Depends(get_cache_repository),
     llm_service: ILLMService = Depends(get_llm_service),
-    embedding_service: IEmbeddingService = Depends(get_embedding_service),
 ) -> ChatUseCase:
     """Get chat use case."""
     return ChatUseCase(
@@ -93,7 +92,6 @@ def get_chat_use_case(
         knowledge_graph_repository=kg_repo,
         cache_repository=cache_repo,
         llm_service=llm_service,
-        embedding_service=embedding_service,
     )
 
 
