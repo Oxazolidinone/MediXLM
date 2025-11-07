@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from application.dto import ChatRequestDTO, ChatResponseDTO, MessageDTO
 from application.use_cases import ChatUseCase
-from presentation.api.dependencies import get_chat_use_case
+from api.dependencies import get_chat_use_case
 
 router = APIRouter()
 
@@ -36,6 +36,21 @@ class MessageResponse(BaseModel):
     tokens_used: Optional[int] = None
 
 
+@router.post("/test-simple", response_model=ChatResponse)
+async def test_simple(
+    request: ChatRequest,
+):
+    """Test endpoint without database."""
+    return ChatResponse(
+        message="Test response - no database access",
+        conversation_id=request.user_id,  # Reuse user_id as placeholder
+        message_id=request.user_id,
+        related_knowledge=[],
+        tokens_used=None,
+        confidence_score=None,
+    )
+
+
 @router.post("/", response_model=ChatResponse)
 async def send_message(
     request: ChatRequest,
@@ -61,6 +76,9 @@ async def send_message(
         )
 
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Chat error: {error_trace}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

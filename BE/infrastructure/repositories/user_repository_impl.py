@@ -79,7 +79,7 @@ class UserRepositoryImpl(IUserRepository):
         user_model = result.scalar_one_or_none()
 
         if user_model:
-            await self.session.delete(user_model)
+            self.session.delete(user_model)
             await self.session.flush()
             return True
         return False

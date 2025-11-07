@@ -2,15 +2,15 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
-from BE.infrastructure.services import LLMService
+from infrastructure.services import LLMService
 from domain.entities import MedicalKnowledge
 from domain.entities.medical_knowledge import KnowledgeType
-from domain.repositories import KnowledgeGraphRepository
+from domain.repositories import IKnowledgeGraphRepository
 from core.exceptions import KnowledgeNotFoundError
 
 
 class KnowledgeUseCase:
-    def __init__( self, knowledge_graph_repository: KnowledgeGraphRepository, embedding_service: LLMService):
+    def __init__( self, knowledge_graph_repository: IKnowledgeGraphRepository, embedding_service: LLMService):
         self.kg_repo = knowledge_graph_repository
         self.embedding_service = embedding_service
 

@@ -75,7 +75,7 @@ class ConversationRepositoryImpl(IConversationRepository):
         conversation_model = result.scalar_one_or_none()
 
         if conversation_model:
-            await self.session.delete(conversation_model)
+            self.session.delete(conversation_model)
             await self.session.flush()
             return True
         return False
@@ -88,7 +88,7 @@ class ConversationRepositoryImpl(IConversationRepository):
             role=message.role.value,
             content=message.content,
             created_at=message.created_at,
-            metadata=message.metadata,
+            message_metadata=message.metadata,
             tokens_used=message.tokens_used,
         )
         self.session.add(message_model)
@@ -138,6 +138,6 @@ class ConversationRepositoryImpl(IConversationRepository):
             role=MessageRole(model.role),
             content=model.content,
             created_at=model.created_at,
-            metadata=model.metadata,
+            metadata=model.message_metadata,
             tokens_used=model.tokens_used,
         )

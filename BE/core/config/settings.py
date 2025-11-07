@@ -19,29 +19,28 @@ class Settings(BaseSettings):
     PORT: int = 8000
     WORKERS: int = 4
 
-    # Database (PostgreSQL)
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/medixlm"
+    # Database (PostgreSQL) - Use localhost with exposed port
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5433/medixlm"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
 
-    # Redis Cache (Upstash Cloud)
-    REDIS_URL: str = "rediss://default:password@your-redis.upstash.io:6379"
+    # Redis Cache (Local Docker)
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_MAX_CONNECTIONS: int = 50
 
-    # Neo4j Knowledge Graph (Aura Cloud)
-    NEO4J_URI: str = "neo4j+s://xxxxxxxx.databases.neo4j.io"
+    # Neo4j Knowledge Graph (Local Docker)
+    NEO4J_URI: str = "neo4j://localhost:7687"
     NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "password"
+    NEO4J_PASSWORD: str = "medixlm123"
 
     # Milvus Vector Database (Cloud)
     MILVUS_URI: str = "https://your-instance.api.gcp-us-west1.zillizcloud.com"
     MILVUS_TOKEN: Optional[str] = None
     MILVUS_COLLECTION_NAME: str = "medical_knowledge"
 
-    QDRANT_URL = "https://<your-qdrant-endpoint>"
-    QDRANT_API_KEY = "<your-api-key>"
-    QDRANT_COLLECTION_NAME = "pubmedqa_vectors"
-    EMBEDDING_DIMENSION = 384
+    QDRANT_URL: str = "https://3f37b80a-92e4-414b-aba1-e4bf2c310ee4.us-east-1-1.aws.cloud.qdrant.io:6333"
+    QDRANT_API_KEY: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.fpqMQfevQiWm0TxWLw4Pap_dClTZmkj_cF1wiqZ4coc"
+    QDRANT_COLLECTION_NAME: str = "pubmedqa_vectors"
 
     # Local LLM (HuggingFace models)
     LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model

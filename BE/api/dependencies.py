@@ -4,7 +4,6 @@ from typing import AsyncGenerator
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from application.interfaces import ILLMService, IEmbeddingService
 from application.use_cases import ChatUseCase, UserUseCase, KnowledgeUseCase
 from domain.repositories import (
     IConversationRepository,
@@ -21,7 +20,7 @@ from infrastructure.repositories import (
     KnowledgeGraphRepositoryImpl,
     CacheRepositoryImpl,
 )
-from infrastructure.services import LocalLLMService, LocalEmbeddingService
+from infrastructure.services import LocalLLMService
 
 
 # Database session dependency
@@ -60,10 +59,9 @@ def get_cache_repository() -> ICacheRepository:
 
 # Service dependencies (singleton instances)
 _llm_service = None
-_embedding_service = None
 
 
-def get_llm_service() -> ILLMService:
+def get_llm_service() -> LocalLLMService:
     """Get LLM service (singleton)."""
     global _llm_service
     if _llm_service is None:
@@ -71,12 +69,10 @@ def get_llm_service() -> ILLMService:
     return _llm_service
 
 
-def get_embedding_service() -> IEmbeddingService:
+def get_embedding_service() -> LocalLLMService:
     """Get embedding service (singleton)."""
-    global _embedding_service
-    if _embedding_service is None:
-        _embedding_service = LocalEmbeddingService()
-    return _embedding_service
+    # Reuse LLM service for embeddings
+    return get_llm_service()
 
 
 # Use case dependencies
@@ -84,8 +80,8 @@ def get_chat_use_case(
     conversation_repo: IConversationRepository = Depends(get_conversation_repository),
     kg_repo: IKnowledgeGraphRepository = Depends(get_knowledge_graph_repository),
     cache_repo: ICacheRepository = Depends(get_cache_repository),
-    llm_service: ILLMService = Depends(get_llm_service),
-    embedding_service: IEmbeddingService = Depends(get_embedding_service),
+    llm_service: LocalLLMService = Depends(get_llm_service),
+    embedding_service: LocalLLMService = Depends(get_embedding_service),
 ) -> ChatUseCase:
     """Get chat use case."""
     return ChatUseCase(
@@ -106,7 +102,7 @@ def get_user_use_case(
 
 def get_knowledge_use_case(
     kg_repo: IKnowledgeGraphRepository = Depends(get_knowledge_graph_repository),
-    embedding_service: IEmbeddingService = Depends(get_embedding_service),
+    embedding_service: LocalLLMService = Depends(get_embedding_service),
 ) -> KnowledgeUseCase:
     """Get knowledge use case."""
     return KnowledgeUseCase(

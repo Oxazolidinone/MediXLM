@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(\"C:\\Users\\Long\\anaconda3\\envs\\medixlm\\python.exe\" \"c:\\Users\\Long\\Downloads\\Đồ án biểu diễn tri thức\\MediXLM\\BE\\main.py\")",
+      "Bash(docker compose exec:*)",
+      "Bash(timeout 60 bash -c 'cd \"\"\"\"c:\\Users\\Long\\Downloads\\Đồ án biểu diễn tri thức\\MediXLM\\BE\"\"\"\" && \"\"\"\"C:\\Users\\Long\\anaconda3\\envs\\medixlm\\python.exe\"\"\"\" main.py')",
+      "Bash(taskkill:*)",
+      "Bash(nul)",
+      "Bash(timeout /t 2 2:*)",
+      "Bash(\"C:\\Users\\Long\\anaconda3\\envs\\medixlm\\python.exe\" -c:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

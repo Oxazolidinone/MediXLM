@@ -53,7 +53,7 @@ class MessageModel(Base):
     role = Column(String(50), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    metadata = Column(JSON, nullable=True)
+    message_metadata = Column(JSON, nullable=True)
     tokens_used = Column(Integer, nullable=True)
 
     # Relationships

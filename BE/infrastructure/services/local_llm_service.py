@@ -1,12 +1,13 @@
 """Local LLM service using transformers."""
 from typing import List, Dict, Any, Optional
 import torch
+import asyncio
 from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStreamer
 from threading import Thread
 from core.config import settings
 
 
-class LLMService():
+class LocalLLMService():
     def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model_name = settings.LLM_MODEL_NAME
@@ -43,7 +44,7 @@ class LLMService():
         prompt_parts.append("Assistant:")
         return "\n".join(prompt_parts)
 
-    async def generate_streaming_response(
+    def generate_streaming_response(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
@@ -75,11 +76,11 @@ class LLMService():
         for text in streamer:
             yield text
 
-    async def generate_embeddings(self, text: str) -> List[float]:
+    def generate_embeddings(self, text: str) -> List[float]:
         embedding = self.model.encode(text, convert_to_numpy=True, show_progress_bar=False)
         return embedding.tolist()
 
-    async def generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_batch_embeddings(self, texts: List[str]) -> List[List[float]]:
         embeddings = self.model.encode(texts, convert_to_numpy=True, show_progress_bar=False, batch_size=32)
         return embeddings.tolist()
 

@@ -20,16 +20,21 @@ async def init_qdrant():
 
     collection_name = settings.QDRANT_COLLECTION_NAME
 
-    collections = [c.name for c in _qdrant_client.get_collections().collections]
-    if collection_name not in collections:
-        # Create new collection
-        _qdrant_client.recreate_collection(
-            collection_name=collection_name,
-            vectors_config=models.VectorParams(
-                size=settings.EMBEDDING_DIMENSION,
-                distance=models.Distance.COSINE
+    try:
+        # Synchronous calls - QdrantClient is blocking but this is initialization only
+        collections = [c.name for c in _qdrant_client.get_collections().collections]
+        if collection_name not in collections:
+            # Create new collection
+            _qdrant_client.recreate_collection(
+                collection_name=collection_name,
+                vectors_config=models.VectorParams(
+                    size=settings.EMBEDDING_DIMENSION,
+                    distance=models.Distance.COSINE
+                )
             )
-        )
+    except Exception as e:
+        print(f"Warning: Qdrant initialization issue: {e}")
+        # Continue even if Qdrant is not available
 
 
 async def close_qdrant():

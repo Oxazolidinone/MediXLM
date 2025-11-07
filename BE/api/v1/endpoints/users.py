@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 from application.dto import UserCreateDTO, UserResponseDTO
 from application.use_cases import UserUseCase
 from core.exceptions import UserAlreadyExistsError, UserNotFoundError
-from presentation.api.dependencies import get_user_use_case
+from api.dependencies import get_user_use_case
 
 router = APIRouter()
 

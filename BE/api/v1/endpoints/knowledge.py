@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from application.use_cases import KnowledgeUseCase
 from domain.entities.medical_knowledge import KnowledgeType
 from core.exceptions import KnowledgeNotFoundError
-from presentation.api.dependencies import get_knowledge_use_case
+from api.dependencies import get_knowledge_use_case
 
 router = APIRouter()
 

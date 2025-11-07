@@ -9,21 +9,24 @@ neo4j_driver: Optional[AsyncDriver] = None
 
 
 async def init_neo4j():
-    """Initialize Neo4j connection to Aura Cloud.
+    """Initialize Neo4j connection.
 
-    Connects to Neo4j Aura using neo4j+s:// protocol (secure with TLS).
-    Aura automatically manages connection pooling and security.
+    Connects to local Neo4j Docker container without TLS encryption.
     """
     global neo4j_driver
 
-    neo4j_driver = AsyncGraphDatabase.driver(
-        settings.NEO4J_URI,
-        auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
-        max_connection_pool_size=50,  # Aura handles pooling efficiently
-        connection_acquisition_timeout=60,  # Cloud connection timeout
-        encrypted=True,  # Always encrypted for Aura
-    )
-    await neo4j_driver.verify_connectivity()
+    try:
+        neo4j_driver = AsyncGraphDatabase.driver(
+            settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+            max_connection_pool_size=50,
+            connection_acquisition_timeout=60,
+            encrypted=False,  # Local Docker doesn't need encryption
+        )
+        await neo4j_driver.verify_connectivity()
+    except Exception as e:
+        print(f"Warning: Neo4j initialization issue: {e}")
+        # Continue even if Neo4j is not available
 
 
 async def close_neo4j():

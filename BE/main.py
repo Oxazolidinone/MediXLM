@@ -8,7 +8,6 @@ from core.logging import setup_logging, get_logger
 from infrastructure.cache import init_redis, close_redis
 from infrastructure.database import init_database, close_database
 from infrastructure.knowledge_graph import init_neo4j, close_neo4j
-from infrastructure.vector_db import init_milvus, close_milvus
 from infrastructure.vector_db import init_qdrant, close_qdrant
 from api.v1 import api_router
 
