@@ -1,14 +1,12 @@
 """Database connection management."""
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
-
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from contextlib import contextmanager
 
 from core.config import settings
 
-# Create async engine
-engine = create_async_engine(
+# Create synchronous engine - no greenlet issues
+engine = create_engine(
     settings.DATABASE_URL,
     echo=settings.DEBUG,
     pool_pre_ping=True,
@@ -16,39 +14,37 @@ engine = create_async_engine(
     max_overflow=settings.DATABASE_MAX_OVERFLOW,
 )
 
-# Create async session factory
-AsyncSessionLocal = async_sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autocommit=False,
-    autoflush=False,
-)
+# Create session factory
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
 
 Base = declarative_base()
 
 
 async def init_database():
     """Initialize database - create all tables."""
-    async with engine.begin() as conn:
-        from .models import Base
-        await conn.run_sync(Base.metadata.create_all)
+    from .models import Base
+    Base.metadata.create_all(bind=engine)
 
 
 async def close_database():
     """Close database connection."""
-    await engine.dispose()
+    engine.dispose()
 
 
-@asynccontextmanager
-async def get_database_session() -> AsyncGenerator[AsyncSession, None]:
+@contextmanager
+def get_database_session() -> Session:
     """Get database session."""
-    async with AsyncSessionLocal() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+    session = SessionLocal()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def get_sync_session():
+    """Get synchronous session."""
+    return SessionLocal()

@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "MediXLM"
     APP_VERSION: str = "1.0.0"
-    DEBUG: bool = False
+    DEBUG: bool = True
     API_V1_PREFIX: str = "/api/v1"
 
     # Server
@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
     WORKERS: int = 4
 
-    # Database (PostgreSQL) - Use localhost with exposed port
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5433/medixlm"
+    # Database (PostgreSQL) - Use synchronous psycopg2 driver to avoid greenlet issues
+    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5433/medixlm"
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
 
@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "https://3f37b80a-92e4-414b-aba1-e4bf2c310ee4.us-east-1-1.aws.cloud.qdrant.io:6333"
     QDRANT_API_KEY: str = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.fpqMQfevQiWm0TxWLw4Pap_dClTZmkj_cF1wiqZ4coc"
     QDRANT_COLLECTION_NAME: str = "pubmedqa_vectors"
+
+    # Ollama Local LLM
+    OLLAMA_HOST: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "qwen2.5:7b"  # Qwen 3 8B model
+    OLLAMA_TIMEOUT: int = 120  # seconds (longer for larger model)
 
     # Local LLM (HuggingFace models)
     LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model

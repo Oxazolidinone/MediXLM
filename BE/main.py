@@ -20,15 +20,34 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Starting MediXLM application...")
     try:
-        await init_database()
-        await init_redis()
-        await init_neo4j()
-        await init_qdrant()
+        try:
+            await init_database()
+            logger.info("Database initialized")
+        except Exception as e:
+            logger.warning(f"Database initialization failed (continuing anyway): {str(e)}")
+
+        try:
+            await init_redis()
+            logger.info("Redis initialized")
+        except Exception as e:
+            logger.warning(f"Redis initialization failed: {str(e)}")
+
+        try:
+            await init_neo4j()
+            logger.info("Neo4j initialized")
+        except Exception as e:
+            logger.warning(f"Neo4j initialization failed: {str(e)}")
+
+        try:
+            await init_qdrant()
+            logger.info("Qdrant initialized")
+        except Exception as e:
+            logger.warning(f"Qdrant initialization failed: {str(e)}")
 
         logger.info("MediXLM application started successfully!")
 
     except Exception as e:
-        logger.error(f"Failed to start application: {str(e)}")
+        logger.error(f"Critical startup error: {str(e)}")
         raise
 
     yield

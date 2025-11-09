@@ -1,4 +1,4 @@
-"""Conversation repository implementation."""
+"""Synchronous conversation repository implementation."""
 from typing import List, Optional
 from uuid import UUID
 
@@ -6,11 +6,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from domain.entities import Conversation, Message, MessageRole
-from domain.repositories import IConversationRepository
 from infrastructure.database.models import ConversationModel, MessageModel
 
 
-class ConversationRepositoryImpl(IConversationRepository):
+class SyncConversationRepository:
+    """Synchronous conversation repository using sync SQLAlchemy session."""
+
     def __init__(self, session: Session):
         self.session = session
 
@@ -51,33 +52,6 @@ class ConversationRepositoryImpl(IConversationRepository):
         )
         conversation_models = result.scalars().all()
         return [self._to_entity(model) for model in conversation_models]
-
-    def update(self, conversation: Conversation) -> Conversation:
-        """Update conversation."""
-        result = self.session.execute(
-            select(ConversationModel).where(ConversationModel.id == conversation.id)
-        )
-        conversation_model = result.scalar_one()
-
-        conversation_model.title = conversation.title
-        conversation_model.updated_at = conversation.updated_at
-        conversation_model.is_active = conversation.is_active
-
-        self.session.flush()
-        return self._to_entity(conversation_model)
-
-    def delete(self, conversation_id: UUID) -> bool:
-        """Delete conversation."""
-        result = self.session.execute(
-            select(ConversationModel).where(ConversationModel.id == conversation_id)
-        )
-        conversation_model = result.scalar_one_or_none()
-
-        if conversation_model:
-            self.session.delete(conversation_model)
-            self.session.flush()
-            return True
-        return False
 
     def add_message(self, message: Message) -> Message:
         """Add message to conversation."""
@@ -122,7 +96,7 @@ class ConversationRepositoryImpl(IConversationRepository):
 
         if hasattr(model, "messages") and model.messages:
             conversation.messages = [
-                ConversationRepositoryImpl._message_to_entity(msg)
+                SyncConversationRepository._message_to_entity(msg)
                 for msg in model.messages
             ]
 

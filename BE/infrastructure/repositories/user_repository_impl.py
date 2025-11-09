@@ -3,7 +3,7 @@ from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from domain.entities import User
 from domain.repositories import IUserRepository
@@ -13,10 +13,10 @@ from infrastructure.database.models import UserModel
 class UserRepositoryImpl(IUserRepository):
     """User repository implementation using SQLAlchemy."""
 
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: Session):
         self.session = session
 
-    async def create(self, user: User) -> User:
+    def create(self, user: User) -> User:
         """Create a new user."""
         user_model = UserModel(
             id=user.id,
@@ -28,36 +28,36 @@ class UserRepositoryImpl(IUserRepository):
             is_active=user.is_active,
         )
         self.session.add(user_model)
-        await self.session.flush()
+        self.session.flush()
         return self._to_entity(user_model)
 
-    async def get_by_id(self, user_id: UUID) -> Optional[User]:
+    def get_by_id(self, user_id: UUID) -> Optional[User]:
         """Get user by ID."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(UserModel).where(UserModel.id == user_id)
         )
         user_model = result.scalar_one_or_none()
         return self._to_entity(user_model) if user_model else None
 
-    async def get_by_username(self, username: str) -> Optional[User]:
+    def get_by_username(self, username: str) -> Optional[User]:
         """Get user by username."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(UserModel).where(UserModel.username == username)
         )
         user_model = result.scalar_one_or_none()
         return self._to_entity(user_model) if user_model else None
 
-    async def get_by_email(self, email: str) -> Optional[User]:
+    def get_by_email(self, email: str) -> Optional[User]:
         """Get user by email."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(UserModel).where(UserModel.email == email)
         )
         user_model = result.scalar_one_or_none()
         return self._to_entity(user_model) if user_model else None
 
-    async def update(self, user: User) -> User:
+    def update(self, user: User) -> User:
         """Update user."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(UserModel).where(UserModel.id == user.id)
         )
         user_model = result.scalar_one()
@@ -68,19 +68,19 @@ class UserRepositoryImpl(IUserRepository):
         user_model.updated_at = user.updated_at
         user_model.is_active = user.is_active
 
-        await self.session.flush()
+        self.session.flush()
         return self._to_entity(user_model)
 
-    async def delete(self, user_id: UUID) -> bool:
+    def delete(self, user_id: UUID) -> bool:
         """Delete user."""
-        result = await self.session.execute(
+        result = self.session.execute(
             select(UserModel).where(UserModel.id == user_id)
         )
         user_model = result.scalar_one_or_none()
 
         if user_model:
             self.session.delete(user_model)
-            await self.session.flush()
+            self.session.flush()
             return True
         return False
 

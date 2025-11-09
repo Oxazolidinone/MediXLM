@@ -1,8 +1,7 @@
 """Dependency injection for API endpoints."""
-from typing import AsyncGenerator
-
+from typing import Generator
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from application.use_cases import ChatUseCase, UserUseCase, KnowledgeUseCase
 from domain.repositories import (
@@ -12,7 +11,7 @@ from domain.repositories import (
     ICacheRepository,
 )
 from infrastructure.cache.redis_client import get_redis_client
-from infrastructure.database.connection import get_database_session
+from infrastructure.database.connection import get_database_session, get_sync_session
 from infrastructure.knowledge_graph.neo4j_client import get_neo4j_driver
 from infrastructure.repositories import (
     ConversationRepositoryImpl,
@@ -24,22 +23,22 @@ from infrastructure.services import LocalLLMService
 
 
 # Database session dependency
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+def get_db_session() -> Generator[Session, None, None]:
     """Get database session."""
-    async with get_database_session() as session:
+    with get_database_session() as session:
         yield session
 
 
 # Repository dependencies
 def get_user_repository(
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
 ) -> IUserRepository:
     """Get user repository."""
     return UserRepositoryImpl(session)
 
 
 def get_conversation_repository(
-    session: AsyncSession = Depends(get_db_session),
+    session: Session = Depends(get_db_session),
 ) -> IConversationRepository:
     """Get conversation repository."""
     return ConversationRepositoryImpl(session)

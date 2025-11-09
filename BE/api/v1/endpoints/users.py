@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
+from sqlalchemy.exc import IntegrityError
 
 from application.dto import UserCreateDTO, UserResponseDTO
 from application.use_cases import UserUseCase
@@ -56,6 +57,12 @@ async def create_user(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
+        )
+    except IntegrityError as e:
+        # Handle database constraint violations (e.g., duplicate email/username)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or username already exists",
         )
     except Exception as e:
         raise HTTPException(
