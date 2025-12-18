@@ -37,7 +37,7 @@ class LocalLLMService:
             full_prompt = f"System: {system_prompt}\nUser: {prompt}\nAssistant:"
             
         payload = {
-            "model": "qwen2.5:1.5b", # Ensure this matches user's model
+            "model": settings.LLM_MODEL_NAME, # Use settings!
             "prompt": full_prompt,
             "stream": False,
             "stream": False,

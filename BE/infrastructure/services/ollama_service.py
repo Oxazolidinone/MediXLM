@@ -3,12 +3,14 @@ import httpx
 from typing import Optional, AsyncGenerator
 
 
+from core.config import settings
+
 class OllamaService:
     """Service to interact with Ollama API for response formatting only."""
     
     def __init__(self, base_url: str = "http://localhost:11434"):
         self.base_url = base_url
-        self.model = "qwen2.5:1.5b"
+        self.model = settings.LLM_MODEL_NAME
         self.timeout = 120.0
     
     async def generate(

@@ -77,7 +77,8 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
         Fetch the node and ALL its relationships (incoming and outgoing).
         """
         query = """
-        MATCH (n) WHERE n.id = $id
+        MATCH (n) 
+        WHERE n.id = $id OR elementId(n) = $id OR toString(id(n)) = $id
         OPTIONAL MATCH (n)-[r_out]->(target)
         OPTIONAL MATCH (source)-[r_in]->(n)
         RETURN n, labels(n) as labels,
@@ -133,32 +134,34 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
     # --- Specific Env Law Queries (Ported from chatbot_v2.py) ---
 
     async def get_obligations(self, subject: str) -> List[Dict[str, Any]]:
-        # 1. DoiTuong (formerly ChuThe) - CO_NGHIA_VU
+        # 1. DoiTuong - CO_NGHIA_VU -> QuyenNghiaVu -> QUY_DINH_TAI -> DieuLuat
         query_doituong = """
         MATCH (d:DoiTuong)-[r:CO_NGHIA_VU]->(q:QuyenNghiaVu)
         WHERE toLower(d.ten) CONTAINS toLower($subject)
+        OPTIONAL MATCH (q)-[:QUY_DINH_TAI]->(dl:DieuLuat)
         RETURN d.ten AS chu_the,
                q.noi_dung AS nghia_vu,
                q.loai AS loai_nghia_vu,
-               q.id AS doi_tuong, /* using QuyenNghiaVu ID as placeholder */
-               q.dieu_khoan AS dieu_khoan,
+               q.id AS doi_tuong,
+               COALESCE(dl.ten, q.dieu_khoan, '') AS dieu_khoan,
                q.pham_vi AS pham_vi,
                "nghia_vu_doi_tuong" as source_type
-        LIMIT 20
+        LIMIT 25
         """
         
-        # 2. CoQuan - CHIU_TRACH_NHIEM
+        # 2. CoQuan - CHIU_TRACH_NHIEM -> TrachNhiem -> QUY_DINH_TAI -> DieuLuat
         query_coquan = """
         MATCH (c:CoQuan)-[r:CHIU_TRACH_NHIEM]->(tn:TrachNhiem)
         WHERE toLower(c.ten) CONTAINS toLower($subject)
            OR ($subject IN ['Chính phủ', 'nhà nước', 'nha nuoc'] AND c.ten = 'Chính phủ')
+        OPTIONAL MATCH (tn)-[:QUY_DINH_TAI]->(dl:DieuLuat)
         RETURN c.ten AS chu_the,
                tn.noi_dung AS nghia_vu,
                tn.ten AS ten_trach_nhiem,
                "Trách nhiệm nhà nước" AS loai_trach_nhiem,
-               "N/A" AS dieu_khoan,
+               COALESCE(dl.ten, tn.dieu_khoan, '') AS dieu_khoan,
                "trach_nhiem_co_quan" as source_type
-        LIMIT 20
+        LIMIT 25
         """
         
         results = []
