@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Environmental Law Chatbot - UPDATED V2
-Based on new Import Schema (DoiTuong, QuyenNghiaVu, HanhVi, etc.)
+Environmental Law Chatbot - UPDATED V2.1
+Based on granular Import Schema (Nodes: DieuLuat, CheTai, etc.)
 """
 import asyncio
 import os
@@ -25,6 +25,7 @@ NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
 async def query_nghia_vu(driver, subject: str) -> str:
     """
     Query obligations using DoiTuong and QuyenNghiaVu.
+    Updated to fetch citation from linked DieuLuat node.
     """
     # Map "nhà nước" to "Chính phủ" or general search
     if subject.lower() in ["nhà nước", "nha nuoc"]:
@@ -33,10 +34,11 @@ async def query_nghia_vu(driver, subject: str) -> str:
     query = """
     MATCH (d:DoiTuong)-[r:CO_NGHIA_VU]->(q:QuyenNghiaVu)
     WHERE toLower(d.ten) CONTAINS toLower($subject)
+    OPTIONAL MATCH (q)-[:QUY_DINH_TAI]->(dl:DieuLuat)
     RETURN DISTINCT d.ten AS chu_the,
            q.noi_dung AS nghia_vu,
            q.loai AS loai_nghia_vu,
-           q.dieu_khoan AS dieu_khoan
+           dl.ten AS dieu_khoan
     LIMIT 15
     """
     
@@ -44,11 +46,12 @@ async def query_nghia_vu(driver, subject: str) -> str:
     query_coquan = """
     MATCH (c:CoQuan)-[r:CHIU_TRACH_NHIEM]->(t:TrachNhiem)
     WHERE toLower(c.ten) CONTAINS toLower($subject)
+    OPTIONAL MATCH (t)-[:QUY_DINH_TAI]->(dl:DieuLuat)
     RETURN DISTINCT c.ten AS chu_the,
            t.noi_dung AS nghia_vu,
            t.ten AS ten_trach_nhiem,
            "Trách nhiệm" AS loai_nghia_vu,
-           "N/A" AS dieu_khoan
+           dl.ten AS dieu_khoan
     LIMIT 15
     """
     
@@ -80,7 +83,17 @@ async def query_nghia_vu(driver, subject: str) -> str:
         if lines: lines.append("")
         lines.append(f"--- Trách nhiệm của {subject} (Cơ quan) ---")
         for r in rec2:
-            line = f"• {r['ten_trach_nhiem']}: {r['nghia_vu']}"
+            trach_nhiem = r.get('ten_trach_nhiem', '')
+            noi_dung = r.get('nghia_vu', '')
+            # If ten_trach_nhiem is roughly same as noi_dung, just show one
+            if len(trach_nhiem) > 50 and trach_nhiem in noi_dung:
+                line = f"• {noi_dung}"
+            else:
+                line = f"• {trach_nhiem}: {noi_dung}"
+                
+            if r.get('dieu_khoan'):
+                line += f" [Căn cứ: {r['dieu_khoan']}]"
+                
             if line not in seen:
                 lines.append(line)
                 seen.add(line)
@@ -94,14 +107,16 @@ async def query_nghia_vu(driver, subject: str) -> str:
 async def query_quyen(driver, subject: str) -> str:
     """
     Query rights using DoiTuong and QuyenNghiaVu (CO_QUYEN).
+    Updated to fetch citation from linked DieuLuat node.
     """
     query = """
     MATCH (d:DoiTuong)-[r:CO_QUYEN]->(q:QuyenNghiaVu)
     WHERE toLower(d.ten) CONTAINS toLower($subject)
+    OPTIONAL MATCH (q)-[:QUY_DINH_TAI]->(dl:DieuLuat)
     RETURN DISTINCT d.ten AS chu_the,
            q.noi_dung AS quyen,
            q.loai AS loai_quyen,
-           q.dieu_khoan AS dieu_khoan
+           dl.ten AS dieu_khoan
     LIMIT 15
     """
     async with driver.session() as session:
@@ -141,6 +156,7 @@ async def query_co_quan(driver) -> str:
         WHEN 'huyen' THEN 3
         WHEN 'xa' THEN 4
         ELSE 5 END
+    LIMIT 20
     """
     async with driver.session() as session:
         result = await session.run(query, {})
@@ -150,7 +166,9 @@ async def query_co_quan(driver) -> str:
     seen = set()
     for r in records:
         cap_vn = {"trung_uong": "Trung ương", "tinh": "Tỉnh", "huyen": "Huyện", "xa": "Xã"}.get(r.get('cap', ''), r.get('cap', 'N/A'))
-        line = f"• {r['ten']} (Cấp: {cap_vn})"
+        line = f"• {r['ten']}"
+        if cap_vn != 'N/A':
+            line += f" (Cấp: {cap_vn})"
         if r.get('mo_ta'):
             line += f"\n  Mô tả: {r['mo_ta']}"
         
@@ -163,11 +181,11 @@ async def query_co_quan(driver) -> str:
 
 async def query_chu_the(driver) -> str:
     """
-    Query all DoiTuong nodes (Replacements for ChuThe).
+    Query all DoiTuong nodes.
     """
     query = """
     MATCH (d:DoiTuong)
-    RETURN DISTINCT d.ten AS ten, d.mo_ta AS mo_ta
+    RETURN DISTINCT d.ten AS ten
     ORDER BY d.ten
     LIMIT 50
     """
@@ -179,9 +197,6 @@ async def query_chu_the(driver) -> str:
     seen = set()
     for r in records:
         line = f"• {r['ten']}"
-        if r.get('mo_ta'):
-            line += f": {r['mo_ta']}"
-        
         if line not in seen:
             lines.append(line)
             seen.add(line)
@@ -191,12 +206,12 @@ async def query_chu_the(driver) -> str:
 
 async def query_che_tai(driver) -> str:
     """
-    Query distinct CheTai info from HanhVi nodes.
+    Query distinct CheTai nodes linked to HanhVi.
+    Updated for new schema.
     """
     query = """
-    MATCH (h:HanhVi)
-    WHERE h.che_tai IS NOT NULL AND h.che_tai <> ""
-    RETURN DISTINCT h.che_tai AS che_tai
+    MATCH (h:HanhVi)-[:CO_CHE_TAI]->(ct:CheTai)
+    RETURN DISTINCT ct.noi_dung AS che_tai, h.ten as hanh_vi
     LIMIT 20
     """
     async with driver.session() as session:
@@ -206,7 +221,7 @@ async def query_che_tai(driver) -> str:
     lines = []
     seen = set()
     for r in records:
-        line = f"• {r['che_tai']}"
+        line = f"• {r['che_tai']} (Áp dụng cho: {r['hanh_vi']})"
         if line not in seen:
             lines.append(line)
             seen.add(line)
@@ -217,10 +232,15 @@ async def query_che_tai(driver) -> str:
 async def query_hanh_vi(driver) -> str:
     """
     Query all HanhVi nodes.
+    Updated to fetch linked CheTai and DieuLuat nodes.
     """
     query = """
     MATCH (h:HanhVi)
-    RETURN DISTINCT h.ten AS ten, h.noi_dung AS noi_dung, h.che_tai AS che_tai
+    OPTIONAL MATCH (h)-[:CO_CHE_TAI]->(ct:CheTai)
+    OPTIONAL MATCH (h)-[:QUY_DINH_TAI]->(dl:DieuLuat)
+    RETURN DISTINCT h.ten AS ten, h.noi_dung AS noi_dung, 
+           collect(distinct ct.noi_dung) AS che_tais,
+           dl.ten AS dieu_khoan
     LIMIT 20
     """
     async with driver.session() as session:
@@ -233,8 +253,15 @@ async def query_hanh_vi(driver) -> str:
         line = f"• {r['ten']}"
         if r.get('noi_dung'):
             line += f": {r['noi_dung']}"
-        if r.get('che_tai'):
-            line += f"\n  [Chế tài: {r['che_tai']}]"
+            
+        che_tais = r.get('che_tais')
+        if che_tais:
+             cleaned_cts = [c for c in che_tais if c]
+             if cleaned_cts:
+                line += f"\n  [Chế tài: {'; '.join(cleaned_cts)}]"
+                
+        if r.get('dieu_khoan'):
+            line += f" [Căn cứ: {r['dieu_khoan']}]"
         
         if line not in seen:
             lines.append(line)
@@ -245,11 +272,12 @@ async def query_hanh_vi(driver) -> str:
 
 async def query_hau_qua(driver, action: str) -> str:
     """
-    Query consequences (CheTai) from HanhVi properties.
+    Query consequences (CheTai) for specific HanhVi.
+    Updated for new schema.
     """
     # Clean the input
     clean = action.lower()
-    for w in ["trái phép", "vi phạm", "bị phạt", "bị xử lý", "như thế nào", "thì sao"]:
+    for w in ["trái phép", "vi phạm", "bị phạt", "bị xử lý", "như thế nào", "thì sao", "hậu quả"]:
         clean = clean.replace(w, "").strip()
     clean = re.sub(r"\s+", " ", clean).strip()
     
@@ -257,9 +285,12 @@ async def query_hau_qua(driver, action: str) -> str:
     MATCH (h:HanhVi)
     WHERE toLower(h.ten) CONTAINS toLower($term)
        OR toLower(h.noi_dung) CONTAINS toLower($term)
+    OPTIONAL MATCH (h)-[:CO_CHE_TAI]->(ct:CheTai)
+    OPTIONAL MATCH (h)-[:QUY_DINH_TAI]->(dl:DieuLuat)
     RETURN DISTINCT h.ten AS hanh_vi, 
            h.noi_dung AS noi_dung_hanh_vi, 
-           h.che_tai AS che_tai
+           collect(distinct ct.noi_dung) AS che_tais,
+           dl.ten AS dieu_khoan
     LIMIT 10
     """
     
@@ -276,8 +307,15 @@ async def query_hau_qua(driver, action: str) -> str:
         line = f"• Hành vi: {r['hanh_vi']}"
         if r.get('noi_dung_hanh_vi'):
             line += f"\n  Chi tiết: {r['noi_dung_hanh_vi']}"
-        if r.get('che_tai'):
-            line += f"\n  → Chế tài: {r['che_tai']}"
+            
+        che_tais = r.get('che_tais')
+        if che_tais:
+             cleaned_cts = [c for c in che_tais if c]
+             if cleaned_cts:
+                line += f"\n  → Chế tài: {'; '.join(cleaned_cts)}"
+                
+        if r.get('dieu_khoan'):
+            line += f" [Căn cứ: {r['dieu_khoan']}]"
         
         if line not in seen:
             lines.append(line)
@@ -289,11 +327,13 @@ async def query_hau_qua(driver, action: str) -> str:
 async def query_khai_niem(driver, term: str) -> str:
     """
     Query assignments from KhaiNiem.
+    Updated to fetch linked DieuLuat.
     """
     query = """
     MATCH (k:KhaiNiem)
     WHERE toLower(k.ten) CONTAINS toLower($term)
-    RETURN DISTINCT k.ten AS ten, k.noi_dung AS noi_dung, k.dieu_khoan AS dieu_khoan
+    OPTIONAL MATCH (k)-[:QUY_DINH_TAI]->(dl:DieuLuat)
+    RETURN DISTINCT k.ten AS ten, k.noi_dung AS noi_dung, dl.ten AS dieu_khoan
     LIMIT 5
     """
     
@@ -377,7 +417,21 @@ def detect_intent(question: str) -> tuple:
         return "che_tai", "", question
         
     # DEFAULT: ĐỊNH NGHĨA
-    term = q.replace("là gì", "").replace("?", "").strip()
+    # Common stop phrases to strip from the end or beginning
+    stop_phrases = [
+        "là gì", "là sao", "như thế nào", "thế nào",
+        "bao gồm những gì", "bao gồm những chất gì", "bao gồm cái gì", "bao gồm gì",
+        "gồm những gì", "gồm những chất gì", "gồm cái gì", "gồm gì",
+        "những gì", "cái gì", "gì", "?"
+    ]
+    
+    term = q
+    for phrase in stop_phrases:
+        term = term.replace(phrase, "")
+    
+    # Also strip "bao gồm" if it's at the start/middle but meant as a connector
+    term = term.replace("bao gồm", "").replace("gồm", "").strip()
+    
     return "dinh_nghia", term, question
 
 

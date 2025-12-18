@@ -59,8 +59,46 @@ class LocalLLMService:
     async def generate_streaming_response(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.7,
+        temperature: float = 0.5,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
     ):
-        pass # Not used currently
+        """
+        Stream response from local Ollama.
+        Yields chunks of text.
+        """
+        url = f"{settings.OLLAMA_API_URL}/api/chat"
+        
+        # Prepare messages
+        ollama_messages = []
+        if system_prompt:
+             ollama_messages.append({"role": "system", "content": system_prompt})
+             
+        for msg in messages:
+            ollama_messages.append({"role": msg["role"], "content": msg["content"]})
+            
+        payload = {
+            "model": settings.LLM_MODEL_NAME, # Use settings!
+            "messages": ollama_messages,
+            "stream": True,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens if max_tokens else 1024,
+            }
+        }
+        
+        try:
+            with requests.post(url, json=payload, stream=True, timeout=self.timeout) as resp:
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if line:
+                        import json
+                        try:
+                            chunk_obj = json.loads(line)
+                            if "message" in chunk_obj and "content" in chunk_obj["message"]:
+                                content = chunk_obj["message"]["content"]
+                                yield content
+                        except json.JSONDecodeError:
+                            pass
+        except Exception as e:
+            yield f"[LLM Error: {str(e)}]"
