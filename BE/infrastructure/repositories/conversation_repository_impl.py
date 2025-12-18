@@ -88,7 +88,7 @@ class ConversationRepositoryImpl(IConversationRepository):
             role=message.role.value,
             content=message.content,
             created_at=message.created_at,
-            metadata=message.metadata,
+            meta_data=message.metadata,
             tokens_used=message.tokens_used,
         )
         self.session.add(message_model)
@@ -138,6 +138,6 @@ class ConversationRepositoryImpl(IConversationRepository):
             role=MessageRole(model.role),
             content=model.content,
             created_at=model.created_at,
-            metadata=model.metadata,
+            metadata=model.meta_data,
             tokens_used=model.tokens_used,
         )

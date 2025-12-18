@@ -4,12 +4,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, TextIteratorStream
 from threading import Thread
 import requests
 from core.config import settings
-from services.local_embedding_service import LocalEmbeddingService
+from .local_embedding_service import LocalEmbeddingService
 
 
 class LocalLLMService:
     def __init__(self):
-        self.api_url = f"{settings.LLM_API_URL}/generate"
+        self.api_url = f"{settings.OLLAMA_API_URL}/generate"
         self.timeout = settings.LLM_TIMEOUT
         self.embedding_service = LocalEmbeddingService() 
 
@@ -27,6 +27,35 @@ class LocalLLMService:
         prompt_parts.append("Assistant:")
         return "\n".join(prompt_parts)
 
+    async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.5) -> str:
+        """Generate a response using the local Ollama Qwen model."""
+        url = f"{settings.OLLAMA_API_URL}/api/generate"
+        
+        # Construct the payload for Ollama
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"System: {system_prompt}\nUser: {prompt}\nAssistant:"
+            
+        payload = {
+            "model": "qwen2.5:1.5b", # Ensure this matches user's model
+            "prompt": full_prompt,
+            "stream": False,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": 1024
+            }
+        }
+        
+        try:
+            resp = requests.post(url, json=payload, timeout=self.timeout)
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("response", "").strip()
+        except Exception as e:
+            print(f"[LLM Error] {e}")
+            return f"Error creating response: {str(e)}"
+
     async def generate_streaming_response(
         self,
         messages: List[Dict[str, str]],
@@ -34,25 +63,4 @@ class LocalLLMService:
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
     ):
-        """Stream tokens from local vLLM API endpoint."""
-        prompt = self._format_messages(messages, system_prompt)
-        payload = {
-            "prompt": prompt,
-            "temperature": temperature,
-            "max_tokens": max_tokens or settings.LLM_MAX_TOKENS,
-        }
-
-        with requests.post(self.api_url, json=payload, stream=True, timeout=self.timeout) as r:
-            for line in r.iter_lines():
-                if not line:
-                    continue
-            decoded = line.decode("utf-8")
-            if decoded.startswith("data: "):
-                yield decoded.replace("data: ", "")
-
-
-    async def generate_embeddings(self, text: str):
-        return await self.embedding_service.generate_embedding(text)
-
-    async def generate_batch_embeddings(self, texts: List[str]):
-        return await self.embedding_service.generate_batch_embeddings(texts)
+        pass # Not used currently

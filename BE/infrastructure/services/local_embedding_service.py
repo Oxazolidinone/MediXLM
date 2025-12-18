@@ -5,7 +5,7 @@ from core.config import settings
 
 class LocalEmbeddingService:
     def __init__(self):
-        self.api_url = f"{settings.EMBEDDING_API_URL}/embeddings"
+        self.api_url = f"{settings.OLLAMA_EMBEDDING_URL}/embeddings"
         self.timeout = settings.LLM_TIMEOUT
 
     async def generate_embedding(self, text: str) -> List[float]:

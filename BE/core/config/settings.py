@@ -39,18 +39,22 @@ class Settings(BaseSettings):
     MILVUS_COLLECTION_NAME: str = "medical_knowledge"
 
     # Qdrant Vector Database (Cloud)
-    QDRANT_URL = "https://<your-qdrant-endpoint>"
-    QDRANT_API_KEY = "<your-api-key>"
-    QDRANT_COLLECTION_NAME = "medical_knowledge"
-    EMBEDDING_DIMENSION = 384
+    QDRANT_URL: str = "https://<your-qdrant-endpoint>"
+    QDRANT_API_KEY: str = "<your-api-key>"
+    QDRANT_COLLECTION_NAME: str = "medical_knowledge"
+    EMBEDDING_DIMENSION: int = 384
+
 
     # Local LLM (HuggingFace models)
     LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model
     LLM_MAX_TOKENS: int = 2000
+    OLLAMA_API_URL: str = "http://localhost:11434" # Force use of this
+    LLM_TIMEOUT: int = 30 # Seconds
 
     # Local Embedding Model
     EMBEDDING_MODEL_NAME: str = "intfloat/e5-base-v2"
     EMBEDDING_DIMENSION: int = 384  # all-MiniLM-L6-v2 dimension
+    OLLAMA_EMBEDDING_URL: str = "http://localhost:11434/api" # Ollama default
 
     # CORS
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
@@ -66,6 +70,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 @lru_cache()

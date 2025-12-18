@@ -1,81 +1,67 @@
-"""Knowledge Graph repository implementation using Neo4j."""
-from typing import List, Optional, Dict, Any
-from uuid import UUID
-
+"""Knowledge Graph repository implementation using Neo4j for Environmental Law."""
+from typing import List, Optional, Dict, Any, Tuple
 from neo4j import AsyncDriver
+import re
 
-from domain.entities import MedicalKnowledge
-from domain.entities.medical_knowledge import KnowledgeType
-from domain.repositories import IKnowledgeGraphRepository
+from domain.entities.env_law_knowledge import EnvLawKnowledge, KnowledgeType
+from domain.repositories.knowledge_graph_repository import IKnowledgeGraphRepository
 
 
 class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
     def __init__(self, driver: AsyncDriver):
         self.driver = driver
 
-    async def create_node(self, knowledge: MedicalKnowledge) -> MedicalKnowledge:
+    async def get_node_by_id(self, node_id: str) -> Optional[EnvLawKnowledge]:
         query = """
-        CREATE (n:MedicalKnowledge {
-            id: $id,
-            name: $name,
-            knowledge_type: $knowledge_type,
-            description: $description,
-            properties: $properties,
-            embeddings: $embeddings,
-            created_at: datetime($created_at),
-            updated_at: datetime($updated_at),
-            source: $source,
-            confidence_score: $confidence_score
-        })
-        RETURN n
+        MATCH (n)
+        WHERE n.id = $id
+        RETURN n, labels(n) as labels
         """
-
-        async with self.driver.session() as session:
-            result = await session.run(
-                query,
-                id=str(knowledge.id),
-                name=knowledge.name,
-                knowledge_type=knowledge.knowledge_type.value,
-                description=knowledge.description,
-                properties=knowledge.properties,
-                embeddings=knowledge.embeddings,
-                created_at=knowledge.created_at.isoformat(),
-                updated_at=knowledge.updated_at.isoformat(),
-                source=knowledge.source,
-                confidence_score=knowledge.confidence_score,
-            )
-            await result.consume()
-
-        return knowledge
-
-    async def get_node_by_id(self, node_id: UUID) -> Optional[MedicalKnowledge]:
-        query = """
-        MATCH (n:MedicalKnowledge {id: $id})
-        RETURN n
-        """
-
         async with self.driver.session() as session:
             result = await session.run(query, id=str(node_id))
             record = await result.single()
 
             if record:
-                return self._to_entity(record["n"])
+                return self._to_entity(record["n"], record["labels"])
             return None
 
-    async def search_by_name(self, name: str, knowledge_type: Optional[KnowledgeType] = None) -> List[MedicalKnowledge]:    
+    async def search_full_text(self, query: str, limit: int = 10) -> List[Tuple[EnvLawKnowledge, float]]:
+        """Search using Full Text Index."""
+        # Clean query for FTS lucene syntax if needed, simple approach for now
+        # Escape special characters or just use standard text search
+        # Using ~ for fuzzy search or wildcard * might be needed
+        clean_query = re.sub(r'[^\w\s]', '', query)
+        if not clean_query.strip():
+            return []
+            
+        fts_query = f"{clean_query}*" 
+        
+        cypher = """
+        CALL db.index.fulltext.queryNodes("envLawIndex", $search_term, {limit: $limit})
+        YIELD node, score
+        RETURN node, score, labels(node) as labels
+        """
+        
+        async with self.driver.session() as session:
+            result = await session.run(cypher, search_term=fts_query, limit=limit)
+            records = await result.values()
+            
+            return [(self._to_entity(record[0], record[2]), record[1]) for record in records]
+
+    async def search_by_name(self, name: str, knowledge_type: Optional[KnowledgeType] = None) -> List[EnvLawKnowledge]:
         if knowledge_type:
             query = """
-            MATCH (n:MedicalKnowledge)
-            WHERE n.name CONTAINS $name AND n.knowledge_type = $knowledge_type
-            RETURN n
+            MATCH (n)
+            WHERE toLower(n.ten) CONTAINS toLower($name) AND $label IN labels(n)
+            RETURN n, labels(n) as labels
             LIMIT 20
             """
-            params = {"name": name, "knowledge_type": knowledge_type.value}
+            params = {"name": name, "label": knowledge_type.value}
         else:
             query = """
-            MATCH (n:MedicalKnowledge)
-            WHERE n.name CONTAINS $name
-            RETURN n
+            MATCH (n)
+            WHERE toLower(n.ten) CONTAINS toLower($name)
+            RETURN n, labels(n) as labels
             LIMIT 20
             """
             params = {"name": name}
@@ -84,134 +70,194 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
             result = await session.run(query, **params)
             records = await result.values()
 
-            return [self._to_entity(record[0]) for record in records]
-
-    async def create_relationship(self, source_id: UUID, target_id: UUID, relationship_type: str, properties: Optional[Dict[str, Any]] = None) -> bool:
+            return [self._to_entity(record[0], record[1]) for record in records]
+            
+    async def get_node_full_context(self, node_id: str) -> Dict[str, Any]:
+        """
+        Fetch the node and ALL its relationships (incoming and outgoing).
+        """
         query = """
-        MATCH (source:MedicalKnowledge {id: $source_id})
-        MATCH (target:MedicalKnowledge {id: $target_id})
-        CREATE (source)-[r:%s $properties]->(target)
-        RETURN r
-        """ % relationship_type
-
+        MATCH (n) WHERE n.id = $id
+        OPTIONAL MATCH (n)-[r_out]->(target)
+        OPTIONAL MATCH (source)-[r_in]->(n)
+        RETURN n, labels(n) as labels,
+               collect(DISTINCT {
+                   type: type(r_out), 
+                   target: target.ten, 
+                   target_desc: coalesce(target.mo_ta, target.noi_dung, ""),
+                   target_label: labels(target)[0], 
+                   props: properties(r_out)
+               }) as outgoing,
+               collect(DISTINCT {
+                   type: type(r_in), 
+                   source: source.ten, 
+                   source_desc: coalesce(source.mo_ta, source.noi_dung, ""),
+                   source_label: labels(source)[0], 
+                   props: properties(r_in)
+               }) as incoming
+        """
         async with self.driver.session() as session:
-            result = await session.run(
-                query,
-                source_id=str(source_id),
-                target_id=str(target_id),
-                properties=properties or {},
-            )
+            result = await session.run(query, id=str(node_id))
             record = await result.single()
-            return record is not None
+            
+            if not record:
+                return {}
+            
+            # Reconstruct node object
+            node_entity = self._to_entity(record["n"], record["labels"])
+            
+            return {
+                "entity": node_entity,
+                "outgoing": [r for r in record["outgoing"] if r['type'] is not None], # Filter out nulls from OPTIONAL MATCH
+                "incoming": [r for r in record["incoming"] if r['type'] is not None]
+            }
 
-    async def get_related_nodes(self, node_id: UUID, relationship_type: Optional[str] = None, depth: int = 1) -> List[MedicalKnowledge]:
+    async def get_related_nodes(self, node_id: str, relationship_type: Optional[str] = None, depth: int = 1) -> List[EnvLawKnowledge]:
         if relationship_type:
             query = """
-            MATCH (n:MedicalKnowledge {id: $id})-[r:%s*1..%d]-(related:MedicalKnowledge)
-            RETURN DISTINCT related
+            MATCH (n {id: $id})-[r:%s*1..%d]-(related)
+            RETURN DISTINCT related, labels(related) as labels
             """ % (relationship_type, depth)
         else:
             query = """
-            MATCH (n:MedicalKnowledge {id: $id})-[*1..%d]-(related:MedicalKnowledge)
-            RETURN DISTINCT related
+            MATCH (n {id: $id})-[*1..%d]-(related)
+            RETURN DISTINCT related, labels(related) as labels
             """ % depth
 
         async with self.driver.session() as session:
             result = await session.run(query, id=str(node_id))
             records = await result.values()
 
-            return [self._to_entity(record[0]) for record in records]
+            return [self._to_entity(record[0], record[1]) for record in records]
 
-    async def similarity_search(self, embeddings: List[float], knowledge_type: Optional[KnowledgeType] = None, limit: int = 10) -> List[MedicalKnowledge]:
-        if knowledge_type:
-            query = """
-            MATCH (n:MedicalKnowledge {knowledge_type: $knowledge_type})
-            WHERE n.embeddings IS NOT NULL
-            RETURN n, gds.similarity.cosine(n.embeddings, $embeddings) AS score
-            ORDER BY score DESC
-            LIMIT $limit
-            """
-            params = {
-                "embeddings": embeddings,
-                "knowledge_type": knowledge_type.value,
-                "limit": limit,
-            }
-        else:
-            query = """
-            MATCH (n:MedicalKnowledge)
-            WHERE n.embeddings IS NOT NULL
-            RETURN n, gds.similarity.cosine(n.embeddings, $embeddings) AS score
-            ORDER BY score DESC
-            LIMIT $limit
-            """
-            params = {"embeddings": embeddings, "limit": limit}
+    # --- Specific Env Law Queries (Ported from chatbot_v2.py) ---
 
+    async def get_obligations(self, subject: str) -> List[Dict[str, Any]]:
+        # 1. DoiTuong (formerly ChuThe) - CO_NGHIA_VU
+        query_doituong = """
+        MATCH (d:DoiTuong)-[r:CO_NGHIA_VU]->(q:QuyenNghiaVu)
+        WHERE toLower(d.ten) CONTAINS toLower($subject)
+        RETURN d.ten AS chu_the,
+               q.noi_dung AS nghia_vu,
+               q.loai AS loai_nghia_vu,
+               q.id AS doi_tuong, /* using QuyenNghiaVu ID as placeholder */
+               q.dieu_khoan AS dieu_khoan,
+               q.pham_vi AS pham_vi,
+               "nghia_vu_doi_tuong" as source_type
+        LIMIT 20
+        """
+        
+        # 2. CoQuan - CHIU_TRACH_NHIEM
+        query_coquan = """
+        MATCH (c:CoQuan)-[r:CHIU_TRACH_NHIEM]->(tn:TrachNhiem)
+        WHERE toLower(c.ten) CONTAINS toLower($subject)
+           OR ($subject IN ['Chính phủ', 'nhà nước', 'nha nuoc'] AND c.ten = 'Chính phủ')
+        RETURN c.ten AS chu_the,
+               tn.noi_dung AS nghia_vu,
+               tn.ten AS ten_trach_nhiem,
+               "Trách nhiệm nhà nước" AS loai_trach_nhiem,
+               "N/A" AS dieu_khoan,
+               "trach_nhiem_co_quan" as source_type
+        LIMIT 20
+        """
+        
+        results = []
         async with self.driver.session() as session:
-            result = await session.run(query, **params)
+            # Map "nhà nước" to "Chính phủ" done in query parameter or python logic
+            search_subject = "Chính phủ" if subject.lower() in ["nhà nước", "nha nuoc"] else subject
+            
+            res1 = await session.run(query_doituong, {"subject": search_subject})
+            results.extend(await res1.data())
+            
+            res2 = await session.run(query_coquan, {"subject": search_subject})
+            results.extend(await res2.data())
+            
+        return results
+
+    async def get_rights(self, subject: str) -> List[Dict[str, Any]]:
+        query = """
+        MATCH (d:DoiTuong)-[r:CO_QUYEN]->(q:QuyenNghiaVu)
+        WHERE toLower(d.ten) CONTAINS toLower($subject)
+        RETURN d.ten AS chu_the,
+               q.noi_dung AS quyen,
+               q.loai AS loai_quyen,
+               q.id AS doi_tuong,
+               q.dieu_khoan AS dieu_khoan
+        LIMIT 15
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query, {"subject": subject})
+            return await result.data()
+
+
+    async def get_consequences(self, action: str) -> List[Dict[str, Any]]:
+        query = """
+        MATCH (h:HanhVi)
+        WHERE toLower(h.ten) CONTAINS toLower($term)
+           OR toLower(h.noi_dung) CONTAINS toLower($term)
+        RETURN h.ten AS hanh_vi, 
+               h.noi_dung AS noi_dung_hanh_vi, 
+               h.che_tai AS che_tai, 
+               "N/A" AS dieu_khoan
+        LIMIT 10
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query, {"term": action})
+            return await result.data()
+
+    async def get_agencies(self) -> List[EnvLawKnowledge]:
+        query = """
+        MATCH (cq:CoQuan)
+        RETURN cq, labels(cq) as labels
+        ORDER BY CASE cq.cap
+            WHEN 'trung_uong' THEN 1
+            WHEN 'tinh' THEN 2
+            WHEN 'huyen' THEN 3
+            WHEN 'xa' THEN 4
+            ELSE 5 END
+        """
+        async with self.driver.session() as session:
+            result = await session.run(query)
             records = await result.values()
+            return [self._to_entity(record[0], record[1]) for record in records]
 
-            return [self._to_entity(record[0]) for record in records]
-
-    async def update_node(self, knowledge: MedicalKnowledge) -> MedicalKnowledge:
+    async def get_all_by_type(self, knowledge_type: KnowledgeType) -> List[EnvLawKnowledge]:
         query = """
-        MATCH (n:MedicalKnowledge {id: $id})
-        SET n.name = $name,
-            n.knowledge_type = $knowledge_type,
-            n.description = $description,
-            n.properties = $properties,
-            n.embeddings = $embeddings,
-            n.updated_at = datetime($updated_at),
-            n.source = $source,
-            n.confidence_score = $confidence_score
-        RETURN n
+        MATCH (n)
+        WHERE $label IN labels(n)
+        RETURN n, labels(n) as labels
+        ORDER BY n.id
         """
-
         async with self.driver.session() as session:
-            result = await session.run(
-                query,
-                id=str(knowledge.id),
-                name=knowledge.name,
-                knowledge_type=knowledge.knowledge_type.value,
-                description=knowledge.description,
-                properties=knowledge.properties,
-                embeddings=knowledge.embeddings,
-                updated_at=knowledge.updated_at.isoformat(),
-                source=knowledge.source,
-                confidence_score=knowledge.confidence_score,
-            )
-            await result.consume()
-
-        return knowledge
-
-    async def delete_node(self, node_id: UUID) -> bool:
-        query = """
-        MATCH (n:MedicalKnowledge {id: $id})
-        DETACH DELETE n
-        RETURN count(n) as deleted
-        """
-
-        async with self.driver.session() as session:
-            result = await session.run(query, id=str(node_id))
-            record = await result.single()
-            return record["deleted"] > 0 if record else False
+            result = await session.run(query, label=knowledge_type.value)
+            records = await result.values()
+            return [self._to_entity(record[0], record[1]) for record in records]
 
     @staticmethod
-    def _to_entity(node) -> MedicalKnowledge:
-        from datetime import datetime
-
-        return MedicalKnowledge(
-            id=UUID(node["id"]),
-            name=node["name"],
-            knowledge_type=KnowledgeType(node["knowledge_type"]),
-            description=node.get("description"),
-            properties=node.get("properties", {}),
-            embeddings=node.get("embeddings"),
-            created_at=datetime.fromisoformat(node["created_at"])
-            if isinstance(node["created_at"], str)
-            else node["created_at"],
-            updated_at=datetime.fromisoformat(node["updated_at"])
-            if isinstance(node["updated_at"], str)
-            else node["updated_at"],
-            source=node.get("source"),
-            confidence_score=node.get("confidence_score", 1.0),
+    def _to_entity(node, labels) -> EnvLawKnowledge:
+        # Determine KnowledgeType from labels
+        # Assuming one main label from our enum maps to KnowledgeType
+        # If multiple, pick the first valid one
+        k_type = KnowledgeType.KHAI_NIEM # Default
+        for label in labels:
+            try:
+                # Map old/new labels to Enum
+                # Check directly if label is in KnowledgeType values
+                # KnowledgeType is string Enum, so we can cast
+                # But 'ChuThe' might exist in old data, new is 'DoiTuong'
+                k_type = KnowledgeType(label)
+                break
+            except ValueError:
+                continue
+                
+        # Map props
+        props = dict(node)
+        
+        return EnvLawKnowledge(
+            id=props.get("id", str(node.id)),
+            name=props.get("ten", "Unknown"),
+            knowledge_type=k_type,
+            description=props.get("mo_ta") or props.get("noi_dung"),
+            source=props.get("dieu_khoan"),
+            properties=props
         )
