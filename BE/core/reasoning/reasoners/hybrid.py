@@ -35,7 +35,7 @@ class HybridReasoner(BaseReasoner):
     
     @property
     def supported_intents(self) -> List[str]:
-        return ["nghia_vu", "quyen", "hau_qua", "che_tai", "dinh_nghia", "yes_no"]
+        return ["nghia_vu", "quyen", "hau_qua", "che_tai", "dinh_nghia", "yes_no", "hanh_vi"]
     
     async def reason(
         self, 
@@ -200,7 +200,7 @@ Trả về JSON:
 """
         
         try:
-            response = await self.llm_service.generate_response(prompt, temperature=0.1)
+            response = await self.llm_service.generate_response(prompt, temperature=0.0)
             
             import json
             import re

@@ -207,7 +207,11 @@ class EnvLawChatbotService:
             (r"(.+?)\s*(?:là|thuộc)\s*(.+?)\s*(?:không|phải không)", "yes_no"),
             (r"(.+?)\s*có\s*nghĩa\s*vụ\s*(.+?)\s*(?:không|chăng)", "yes_no"),
             (r"(.+?)\s*có\s*trách\s*nhiệm\s*(.+?)\s*(?:không|chăng)", "yes_no"),
-            (r"liệu\s*(.+?)\s*có\s*(.+?)\s*(?:không|chăng)", "yes_no"), # Added "Liệu..." pattern
+            (r"liệu\s*(.+?)\s*có\s*(.+?)\s*(?:không|chăng)", "yes_no"),
+            # THÊM: "có bị xử phạt không", "có bị cấm không"
+            (r"(.+?)\s*có\s*bị\s*(.+?)\s*(?:không|chăng)", "yes_no"),
+            # THÊM: General "có...không?" với bất kỳ verb
+            (r"(.+?)\s*có\s*(.+?)\s*(?:không|chăng)\s*\??\s*$", "yes_no"),
         ]
         for pattern, intent in yes_no_patterns:
             match = re.search(pattern, q, re.IGNORECASE)
@@ -223,33 +227,73 @@ class EnvLawChatbotService:
                 if claim and len(claim) > 2:
                     return intent, claim
         
-        # 1. NGHĨA VỤ / TRÁCH NHIỆM - obligations
-        nghia_vu_patterns = [
-            (r"(.+?)\s*có\s*nghĩa\s*vụ", "nghia_vu"),
-            (r"(.+?)\s*có\s*trách\s*nhiệm", "nghia_vu"),
-            (r"(.+?)\s*phải\s*làm\s*gì", "nghia_vu"),
-            (r"nghĩa\s*vụ\s*(?:của\s*)?(.+)", "nghia_vu"),
-            (r"trách\s*nhiệm\s*(?:của\s*)?(.+)", "nghia_vu"),
+        # 1. NGHĨA VỤ / TRÁCH NHIỆM - obligations/responsibilities
+        # Cần phân biệt: trách nhiệm cơ quan nhà nước vs nghĩa vụ tổ chức/cá nhân
+        
+        # Keywords để nhận diện cơ quan nhà nước
+        co_quan_keywords = ["bộ", "ubnd", "ủy ban", "chính phủ", "thủ tướng", "quốc hội", 
+                           "sở", "cục", "vụ", "ban quản lý", "cơ quan", "tn&mt", "tnmt", 
+                           "tài nguyên", "môi trường", "quốc phòng", "công an"]
+        
+        # Check nếu entity là cơ quan nhà nước
+        def is_co_quan_nha_nuoc(entity_text: str) -> bool:
+            entity_lower = entity_text.lower()
+            return any(kw in entity_lower for kw in co_quan_keywords)
+        
+        # Patterns cho cả nghĩa vụ và trách nhiệm
+        obligation_patterns = [
+            # "X có nghĩa vụ gì"
+            (r"(.+?)\s*có\s*(?:những\s*)?nghĩa\s*vụ\s*(?:gì|nào|như thế nào)?", "nghia_vu"),
+            # "X có trách nhiệm gì" - tùy entity sẽ quyết định nghia_vu hay trach_nhiem
+            (r"(.+?)\s*có\s*(?:những\s*)?trách\s*nhiệm\s*(?:gì|nào|như thế nào)?", "trach_nhiem_check"),
+            # "nghĩa vụ của X"
+            (r"(?:các\s*)?nghĩa\s*vụ\s*(?:của\s*)?(.+?)(?:\s*là\s*gì\s*\??)?$", "nghia_vu"),
+            # "trách nhiệm của X"
+            (r"(?:các\s*)?trách\s*nhiệm\s*(?:của\s*)?(.+?)(?:\s*là\s*gì\s*\??)?$", "trach_nhiem_check"),
+            # "X phải làm gì"
+            (r"(.+?)\s*(?:phải|cần)\s*làm\s*(?:những\s*)?gì", "nghia_vu"),
+            # "những nghĩa vụ/trách nhiệm của X"
+            (r"những\s*nghĩa\s*vụ\s*(?:của\s*)?(.+)", "nghia_vu"),
+            (r"những\s*trách\s*nhiệm\s*(?:của\s*)?(.+)", "trach_nhiem_check"),
         ]
-        for pattern, intent in nghia_vu_patterns:
+        
+        for pattern, intent_type in obligation_patterns:
             match = re.search(pattern, q, re.IGNORECASE)
             if match:
                 entity = match.group(1).strip()
-                for w in ["có", "gì", "của", "phải", "làm", "những", "trách", "nhiệm", "nghĩa", "vụ"]:
+                # Cleanup "là gì?"
+                entity = re.sub(r"\s*là\s*gì\s*\??$", "", entity, flags=re.IGNORECASE).strip()
+                # Normalize entity
+                for w in ["có", "gì", "của", "phải", "làm", "những", "trách", "nhiệm", "nghĩa", "vụ", 
+                          "như thế nào", "là", "các", "nào", "?", "cần"]:
+                    entity = re.sub(rf"^\s*{w}\s*", "", entity, flags=re.IGNORECASE).strip()
                     entity = re.sub(rf"\s*{w}\s*$", "", entity, flags=re.IGNORECASE).strip()
+                
                 if entity and len(entity) > 1:
-                    return intent, entity
+                    # Quyết định intent dựa trên entity
+                    if intent_type == "trach_nhiem_check":
+                        # Nếu là cơ quan nhà nước -> trach_nhiem
+                        if is_co_quan_nha_nuoc(entity):
+                            return "trach_nhiem", entity
+                        else:
+                            return "nghia_vu", entity
+                    return intent_type, entity
         
         # 2. QUYỀN - rights
+        # Bao quát: "X có quyền gì", "quyền của X", "quyền X là gì"
         quyen_patterns = [
-            (r"(.+?)\s*có\s*quyền", "quyen"),
-            (r"quyền\s*(?:của\s*)?(.+)", "quyen"),
+            (r"(.+?)\s*có\s*(?:những\s*)?quyền\s*(?:gì|nào|như thế nào)?", "quyen"),
+            (r"(?:các\s*)?quyền\s*(?:của\s*)?(.+?)(?:\s*là\s*gì\s*\??)?$", "quyen"),
+            (r"những\s*quyền\s*(?:của\s*)?(.+)", "quyen"),
         ]
         for pattern, intent in quyen_patterns:
             match = re.search(pattern, q, re.IGNORECASE)
             if match:
                 entity = match.group(1).strip()
-                for w in ["có", "gì", "của", "những"]:
+                # Cleanup mạnh: loại bỏ "là gì?" trước
+                entity = re.sub(r"\s*là\s*gì\s*\??$", "", entity, flags=re.IGNORECASE).strip()
+                for w in ["có", "gì", "của", "những", "quyền", "như thế nào", "là", "các", "nào", "?"]:
+                    entity = re.sub(rf"^\s*{w}\s*", "", entity, flags=re.IGNORECASE).strip()
                     entity = re.sub(rf"\s*{w}\s*$", "", entity, flags=re.IGNORECASE).strip()
                 if entity and len(entity) > 1:
                     return intent, entity
@@ -395,10 +439,39 @@ class EnvLawChatbotService:
                     
                     # Add legal citation - BẮT BUỘC hiển thị nếu có
                     if dieu_khoan:
-                        line += f" (Căn cứ: {dieu_khoan})"
+                        line += f"\n  → Căn cứ vào {dieu_khoan} của Luật BVMT 2020"
                     
                     lines.append(line)
                 return "\n\n".join(lines)
+
+            elif intent == "trach_nhiem":
+                # Trách nhiệm của cơ quan nhà nước (Bộ, UBND, Chính phủ...)
+                records = await self.kg_repo.get_responsibilities(entity)
+                if not records: 
+                    return f"Không tìm thấy trách nhiệm của '{entity}' trong cơ sở tri thức."
+                
+                lines = [f"**Trách nhiệm của {entity}:**\n"]
+                for r in records:
+                    co_quan = r.get('co_quan', '')
+                    trach_nhiem = r.get('trach_nhiem', '')
+                    ten_tn = r.get('ten_trach_nhiem', '')
+                    dieu_khoan = r.get('dieu_khoan', '')
+                    
+                    # Format content
+                    if ten_tn and trach_nhiem:
+                        line = f"• **{ten_tn}**: {trach_nhiem}"
+                    elif trach_nhiem:
+                        line = f"• {trach_nhiem}"
+                    else:
+                        continue
+                    
+                    # Add legal citation
+                    if dieu_khoan:
+                        line += f"\n  → Căn cứ vào {dieu_khoan} của Luật BVMT 2020"
+                    
+                    lines.append(line)
+                
+                return "\n\n".join(lines) if len(lines) > 1 else f"Không tìm thấy trách nhiệm cụ thể của '{entity}'."
 
             elif intent == "quyen":
                 records = await self.kg_repo.get_rights(entity)
@@ -406,45 +479,119 @@ class EnvLawChatbotService:
                 lines = []
                 for r in records:
                     line = f"• {r['chu_the']}: {r['quyen']}"
-                    if r.get('dieu_khoan'): line += f" [{r['dieu_khoan']}]"
+                    if r.get('dieu_khoan'):
+                        line += f"\n  → Căn cứ vào {r['dieu_khoan']} của Luật BVMT 2020"
                     lines.append(line)
                 return "\n\n".join(lines)
             
             elif intent == "co_quan":
                 nodes = await self.kg_repo.get_agencies()
                 if not nodes: return await self.answer_general_question(question)
-                return "\n".join([f"• {n.name} ({n.properties.get('cap', '')})" for n in nodes])
+                lines = []
+                for n in nodes:
+                    line = f"• **{n.name}**"
+                    if n.properties.get('cap'):
+                        line += f" ({n.properties.get('cap')})"
+                    if n.description:
+                        line += f"\n  {n.description[:150]}..." if len(n.description) > 150 else f"\n  {n.description}"
+                    if n.source:
+                        line += f"\n  → Căn cứ: {n.source}"
+                    lines.append(line)
+                return "\n\n".join(lines) if lines else await self.answer_general_question(question)
             
             elif intent == "chu_the":
-                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.CHU_THE)
+                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.DOI_TUONG)
                 if not nodes: return await self.answer_general_question(question)
-                return "\n".join([f"• {n.name}" for n in nodes])
+                lines = []
+                for n in nodes:
+                    line = f"• **{n.name}**"
+                    if n.description:
+                        line += f": {n.description[:100]}..." if len(n.description) > 100 else f": {n.description}"
+                    if n.source:
+                        line += f"\n  → Căn cứ: {n.source}"
+                    lines.append(line)
+                return "\n\n".join(lines) if lines else await self.answer_general_question(question)
             
             elif intent == "che_tai":
-                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.CHE_TAI)
-                if not nodes: return await self.answer_general_question(question)
-                return "\n".join([f"• {n.name} ({n.properties.get('loai', '')})" for n in nodes])
+                # Lấy chế tài từ HanhVi có CO_CHE_TAI relationship
+                records = await self.kg_repo.get_consequences("")
+                if not records: return await self.answer_general_question(question)
+                lines = []
+                seen_che_tai = set()
+                for r in records:
+                    che_tai = r.get('che_tai', '')
+                    if che_tai and che_tai not in seen_che_tai:
+                        seen_che_tai.add(che_tai)
+                        line = f"• {che_tai}"
+                        if r.get('dieu_khoan'):
+                            line += f"\n  → Căn cứ: {r['dieu_khoan']}"
+                        lines.append(line)
+                return "\n\n".join(lines) if lines else await self.answer_general_question(question)
                 
             elif intent == "hanh_vi":
-                 if entity:
-                     # If user specifies a behavior, use GraphRAG to find details
-                     return await self.answer_general_question(question)
-                 
-                 nodes = await self.kg_repo.get_all_by_type(KnowledgeType.HANH_VI)
-                 if not nodes: return await self.answer_general_question(question)
-                 # Simpler listing for generic call
-                 return "\n".join([f"• {n.name} ({n.properties.get('trang_thai', '')})" for n in nodes])
+                # Dùng get_consequences để lấy tất cả hành vi vi phạm từ KG
+                records = await self.kg_repo.get_consequences(entity or "vi phạm")
+                
+                if records:
+                    lines = []
+                    for r in records:
+                        hanh_vi = r.get('hanh_vi', '')
+                        noi_dung = r.get('noi_dung_hanh_vi', '')
+                        dieu_khoan = r.get('dieu_khoan', '')
+                        che_tai = r.get('che_tai', '')
+                        
+                        if hanh_vi and noi_dung:
+                            line = f"• {hanh_vi}: {noi_dung}"
+                        elif hanh_vi:
+                            line = f"• {hanh_vi}"
+                        else:
+                            continue
+                        
+                        if che_tai:
+                            line += f"\n  [Chế tài: {che_tai}]"
+                        
+                        if dieu_khoan:
+                            line += f"\n  → Căn cứ vào {dieu_khoan} của Luật BVMT 2020"
+                        
+                        lines.append(line)
+                    
+                    if lines:
+                        return "\n\n".join(lines)
+                
+                # Fallback nếu không có data
+                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.HANH_VI)
+                if not nodes: 
+                    return "Không tìm thấy thông tin về hành vi vi phạm trong cơ sở tri thức."
+                return "\n".join([f"• {n.name}" for n in nodes])
             
             elif intent == "giai_doan":
                 nodes = await self.kg_repo.get_all_by_type(KnowledgeType.GIAI_DOAN)
                 if not nodes: return await self.answer_general_question(question)
                 nodes.sort(key=lambda x: x.properties.get('thu_tu', '99'))
-                return "\n".join([f"{n.properties.get('thu_tu', '?')}. {n.name}" for n in nodes])
+                lines = []
+                for n in nodes:
+                    line = f"{n.properties.get('thu_tu', '?')}. **{n.name}**"
+                    if n.description:
+                        line += f"\n   {n.description[:150]}..." if len(n.description) > 150 else f"\n   {n.description}"
+                    if n.source:
+                        line += f"\n   → Căn cứ: {n.source}"
+                    lines.append(line)
+                return "\n\n".join(lines) if lines else await self.answer_general_question(question)
                 
             elif intent == "thu_tuc":
-                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.THU_TUC)
+                nodes = await self.kg_repo.get_all_by_type(KnowledgeType.BUOC_QUY_TRINH)
                 if not nodes: return await self.answer_general_question(question)
-                return "\n".join([f"• {n.name} (CQ: {n.properties.get('co_quan', 'N/A')})" for n in nodes])
+                lines = []
+                for n in nodes:
+                    line = f"• **{n.name}**"
+                    if n.properties.get('co_quan'):
+                        line += f" (Cơ quan: {n.properties.get('co_quan')})"
+                    if n.description:
+                        line += f"\n  {n.description[:150]}..." if len(n.description) > 150 else f"\n  {n.description}"
+                    if n.source:
+                        line += f"\n  → Căn cứ: {n.source}"
+                    lines.append(line)
+                return "\n\n".join(lines) if lines else await self.answer_general_question(question)
 
             elif intent == "hau_qua":
                 # 1. Reasoning Check (Forward + Traversal)
@@ -659,9 +806,23 @@ JSON:
                     kg_evidence.append(f"- Có quyền: {r['quyen']} [Căn cứ: {r.get('dieu_khoan', '')}]")
 
         elif relationship_type == "HANH_VI" or relationship_type == "CHE_TAI":
-             # Search behaviors
-             # Logic implies checking if Subject performs Action is a violation
-             pass # Simplified for now, relying on general fallback below if empty
+             # Lấy thông tin về hành vi vi phạm và chế tài
+             records = await self.kg_repo.get_consequences(subject)
+             for r in records:
+                 hanh_vi = r.get('hanh_vi', '')
+                 noi_dung = r.get('noi_dung_hanh_vi', '')
+                 che_tai = r.get('che_tai', '')
+                 dieu_khoan = r.get('dieu_khoan', '')
+                 
+                 if hanh_vi:
+                     evidence_line = f"- Hành vi: {hanh_vi}"
+                     if noi_dung:
+                         evidence_line += f" - {noi_dung}"
+                     if che_tai:
+                         evidence_line += f" [Chế tài: {che_tai}]"
+                     if dieu_khoan:
+                         evidence_line += f" [Căn cứ: {dieu_khoan}]"
+                     kg_evidence.append(evidence_line)
 
         # If strict specific search failed, try broader FTS on predicate + subject
         if not kg_evidence and predicate:
@@ -762,35 +923,65 @@ Trả về (chỉ cụm từ):
             # We want to find who has this Action/Concept
             context = await self.kg_repo.get_node_full_context(node.id)
             if context:
+                # Lấy căn cứ pháp lý từ outgoing QUY_DINH_TAI
+                dieu_khoan = ""
+                for out in context.get('outgoing', []):
+                    if out.get('type') == 'QUY_DINH_TAI' and out.get('target'):
+                        dieu_khoan = out['target']
+                        break
+                if not dieu_khoan and node.source:
+                    dieu_khoan = node.source
+                    
                 # Check incoming
                 for inc in context.get('incoming', []):
                     # We are looking for Subject -> [CO_NGHIA_VU/CO_QUYEN/CHIU_TRACH_NHIEM] -> Node
                     if inc['type'] in ['CO_NGHIA_VU', 'CO_QUYEN', 'CHIU_TRACH_NHIEM', 'THUC_HIEN']:
-                         candidates.append(f"{inc['source']} --[{inc['type']}]--> {node.name} ({node.description[:50]}...)")
+                        desc = node.description[:50] if node.description else ""
+                        line = f"{inc['source']} --[{inc['type']}]--> {node.name} ({desc}...)"
+                        if dieu_khoan:
+                            line += f" [Căn cứ: {dieu_khoan}]"
+                        candidates.append(line)
 
                 # Check outgoing (e.g. Agency -> [CHIU_TRACH_NHIEM] -> Responsibility)
-                # If the matched node IS the Subject (unlikely for "Who" questions usually match the action)
-                if node.labels and ('DoiTuong' in node.labels or 'CoQuan' in node.labels):
-                     candidates.append(f"{node.name} (Matched term directly)")
+                # If the matched node IS the Subject
+                node_type = node.knowledge_type.value if node.knowledge_type else ""
+                if node_type in ['DoiTuong', 'CoQuan']:
+                    line = f"{node.name} (Matched term directly)"
+                    if dieu_khoan:
+                        line += f" [Căn cứ: {dieu_khoan}]"
+                    candidates.append(line)
 
         if not candidates:
              # Fallback: Just ask LLM with general context
              return await self.answer_general_question(question)
-             
-        # Ask LLM to synthesize answer
-        context_str = "\n".join(set(candidates))
-        final_prompt = f"""
-Bạn đang trả lời câu hỏi: "{question}"
-Dựa vào dữ liệu tìm thấy từ Knowledge Graph:
-{context_str}
+              
+        # Dùng LLM để VIẾT CÂU VĂN từ dữ liệu KG (KHÔNG sinh tri thức mới)
+        raw_data = "\n".join(set(candidates))
+        
+        format_prompt = f"""BẠN LÀ TRỢ LÝ VIẾT VĂN PHÁP LUẬT TIẾNG VIỆT.
 
-Hãy liệt kê các ĐỐI TƯỢNG (Ai/Cơ quan nào) thỏa mãn câu hỏi.
-Nếu không chắc chắn, hãy nói "Dựa trên dữ liệu tìm thấy..."
-"""
+CÂU HỎI: {question}
+
+DỮ LIỆU TỪ KNOWLEDGE GRAPH:
+{raw_data}
+
+QUY TẮC BẮT BUỘC:
+1. PHẢI viết 100% TIẾNG VIỆT
+2. Mỗi chủ thể một dòng, bắt đầu bằng "•"
+3. Cuối mỗi dòng PHẢI có căn cứ pháp lý nếu có trong dữ liệu (Căn cứ: Điều X, Khoản Y)
+4. KHÔNG thêm thông tin mới, KHÔNG bịa đặt
+
+VIẾT NGAY (TIẾNG VIỆT):"""
+
         try:
-            return await self.llm_service.generate_response(final_prompt, temperature=0.1)
+            formatted = await self.llm_service.generate_response(format_prompt, temperature=0.0)
+            return formatted.strip()
         except Exception as e:
-            return await self.answer_general_question(question)
+            # Fallback: hiển thị raw
+            lines = [f"**Kết quả tra cứu: {search_query}**\n"]
+            for c in set(candidates):
+                lines.append(f"• {c}")
+            return "\n".join(lines)
 
 
     async def answer_general_question(self, question: str) -> str:
@@ -852,26 +1043,100 @@ Nếu không chắc chắn, hãy nói "Dựa trên dữ liệu tìm thấy..."
             if inc.get('props', {}).get('dieu_khoan'): detail += f" [Căn cứ: {inc['props']['dieu_khoan']}]"
             raw_relations.append(detail)
             
-        # 5. Ask LLM
-        llm_prompt = f"""
-        Bạn là trợ lý pháp luật. Hãy trả lời câu hỏi của người dùng DỰA TRÊN dữ liệu Graph được cung cấp dưới đây.
+        # 5. Dùng LLM để VIẾT CÂU VĂN từ dữ liệu KG (KHÔNG sinh tri thức mới)
+        raw_data = "\n".join(raw_relations[:15])
         
-        Câu hỏi: "{question}"
-        
-        Dữ liệu Graph liên quan:
-        {chr(10).join(raw_relations[:20])}
-        
-        Yêu cầu:
-        1. Trả lời trực tiếp vào câu hỏi.
-        2. Dẫn chứng điều khoản (nếu có trong dữ liệu).
-        3. Nếu dữ liệu không đủ để trả lời, hãy nói "Dựa trên dữ liệu hiện có, tôi chỉ tìm thấy thông tin về {best_node.name} như sau..." và tóm tắt thông tin đó.
-        4. KHÔNG bịa đặt.
+        format_prompt = f"""VIẾT BẰNG TIẾNG VIỆT. KHÔNG DÙNG TIẾNG ANH.
+
+Chủ đề: {best_node.name}
+Mô tả: {entity_obj.description or 'Không có'}
+Căn cứ: {entity_obj.source or 'Không có'}
+
+Các mối quan hệ:
+{raw_data}
+
+YÊU CẦU: Viết thành đoạn văn TIẾNG VIỆT.
+- Chỉ dùng thông tin có sẵn
+- Không thêm gì mới
+- Viết thành câu văn mạch lạc
+
+TRẢ LỜI TIẾNG VIỆT:"""
+
+        try:
+            formatted = await self.llm_service.generate_response(format_prompt, temperature=0.0)
+            return formatted.strip()
+        except Exception as e:
+            # Fallback: hiển thị raw
+            lines = []
+            lines.append(f"**{best_node.name}**")
+            if entity_obj.description:
+                lines.append(f"\n{entity_obj.description}")
+            if entity_obj.source:
+                lines.append(f"\n📜 Căn cứ: {entity_obj.source}")
+            if raw_relations:
+                lines.append("\n---")
+                for r in raw_relations[:15]:
+                    lines.append(f"• {r}")
+            return "\n".join(lines)
+
+    async def answer_with_graphrag(self, question: str) -> str:
         """
+        Use GraphRAG reasoner as default for answering questions.
+        This provides community-based retrieval + LLM synthesis (format only).
+        """
+        intent, entity = self.detect_intent(question)
+        print(f"  [GraphRAG] Intent: {intent}, Entity: '{entity}'")
+        
+        # Find GraphRAG reasoner
+        graphrag = None
+        for r in self.reasoners:
+            if r.name == "GraphRAG":
+                graphrag = r
+                break
+        
+        if not graphrag:
+            return await self.answer_general_question(question)
         
         try:
-            return await self.llm_service.generate_response(llm_prompt, temperature=0.0)
+            # Run GraphRAG reasoner
+            result = await graphrag.reason(question, intent, entity, {})
+            
+            if result.success and result.conclusions:
+                raw_data = "\n".join(result.conclusions)
+                
+                # Kiểm tra intent từ metadata của reasoner
+                parsed_intent = result.metadata.get("intent", "") if result.metadata else ""
+                
+                # Với CONSEQUENCE hoặc hanh_vi: trả về raw data KHÔNG qua LLM
+                # vì data đã có căn cứ pháp lý, LLM hay bỏ mất khi format
+                if intent == "hanh_vi" or parsed_intent == "consequence":
+                    return raw_data
+                
+                # Các intent khác: Format với LLM
+                format_prompt = f"""BẠN LÀ TRỢ LÝ VIẾT VĂN PHÁP LUẬT TIẾNG VIỆT.
+
+CÂU HỎI: {question}
+
+DỮ LIỆU TỪ KNOWLEDGE GRAPH:
+{raw_data}
+
+QUY TẮC BẮT BUỘC:
+1. PHẢI viết 100% TIẾNG VIỆT - KHÔNG dùng tiếng Anh
+2. Mỗi thông tin một dòng, bắt đầu bằng "•"
+3. Cuối mỗi dòng PHẢI COPY NGUYÊN VĂN căn cứ pháp lý (Căn cứ: Điều X, Khoản Y)
+4. KHÔNG thêm thông tin mới, KHÔNG bịa đặt
+5. Giữ nguyên TẤT CẢ nội dung - KHÔNG cắt ngắn, KHÔNG lược bỏ
+
+VIẾT NGAY (TIẾNG VIỆT):"""
+
+                formatted = await self.llm_service.generate_response(format_prompt, temperature=0.0)
+                return formatted.strip()
+            else:
+                return await self.answer_general_question(question)
+                
         except Exception as e:
-            return f"Lỗi khi tạo câu trả lời: {str(e)}"
+            print(f"  [GraphRAG] Error: {e}")
+            return await self.answer_general_question(question)
 
     # =========================================================================
     # MULTI-REASONER METHODS

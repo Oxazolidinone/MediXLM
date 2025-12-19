@@ -11,13 +11,14 @@ class OllamaService:
     def __init__(self, base_url: str = "http://localhost:11434"):
         self.base_url = base_url
         self.model = settings.LLM_MODEL_NAME
-        self.timeout = 120.0
+        # 3600 giây = 1 tiếng
+        self.timeout = 3600
     
     async def generate(
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.3,
+        temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> str:
         """Generate a response from Ollama (non-streaming).
@@ -57,7 +58,7 @@ class OllamaService:
         self,
         prompt: str,
         system_prompt: Optional[str] = None,
-        temperature: float = 0.3,
+        temperature: float = 0.0,
         max_tokens: int = 1024,
     ) -> AsyncGenerator[str, None]:
         """Stream response from Ollama.

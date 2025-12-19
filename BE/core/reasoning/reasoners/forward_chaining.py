@@ -36,7 +36,7 @@ class ForwardChainingReasoner(BaseReasoner):
     
     @property
     def supported_intents(self) -> List[str]:
-        return ["nghia_vu", "quyen", "thoi_han", "che_tai", "hau_qua"]
+        return ["nghia_vu", "quyen", "thoi_han", "che_tai", "hau_qua", "hanh_vi"]
     
     async def reason(
         self, 

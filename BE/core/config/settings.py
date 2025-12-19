@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model
     LLM_MAX_TOKENS: int = 2000
     OLLAMA_API_URL: str = "http://localhost:11434" # Force use of this
-    LLM_TIMEOUT: int = 120 # Seconds
+    LLM_TIMEOUT: Optional[int] = None  # None = không giới hạn thời gian chờ
 
     # Local Embedding Model
     EMBEDDING_MODEL_NAME: str = "intfloat/e5-base-v2"

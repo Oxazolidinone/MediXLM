@@ -41,7 +41,7 @@ class GraphTraversalReasoner(BaseReasoner):
     
     @property
     def supported_intents(self) -> List[str]:
-        return ["hau_qua", "che_tai", "dinh_nghia", "nghia_vu", "quyen"]
+        return ["hau_qua", "che_tai", "dinh_nghia", "nghia_vu", "quyen", "hanh_vi"]
     
     async def reason(
         self, 

@@ -10,7 +10,8 @@ from .local_embedding_service import LocalEmbeddingService
 class LocalLLMService:
     def __init__(self):
         self.api_url = f"{settings.OLLAMA_API_URL}/generate"
-        self.timeout = settings.LLM_TIMEOUT
+        # 3600 giây = 1 tiếng, đủ cho mọi request
+        self.timeout = 3600
         self.embedding_service = LocalEmbeddingService() 
 
     def _format_messages(self, messages: List[Dict[str, str]], system_prompt: Optional[str] = None) -> str:
@@ -27,7 +28,7 @@ class LocalLLMService:
         prompt_parts.append("Assistant:")
         return "\n".join(prompt_parts)
 
-    async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.5) -> str:
+    async def generate_response(self, prompt: str, system_prompt: Optional[str] = None, temperature: float = 0.0) -> str:
         """Generate a response using the local Ollama Qwen model."""
         url = f"{settings.OLLAMA_API_URL}/api/generate"
         
@@ -40,10 +41,9 @@ class LocalLLMService:
             "model": settings.LLM_MODEL_NAME, # Use settings!
             "prompt": full_prompt,
             "stream": False,
-            "stream": False,
             "options": {
                 "temperature": temperature,
-                "num_predict": 1024
+                "num_predict": 8192  # Đủ lớn cho câu trả lời dài, nhưng có giới hạn tránh timeout
             }
         }
         
@@ -59,7 +59,7 @@ class LocalLLMService:
     async def generate_streaming_response(
         self,
         messages: List[Dict[str, str]],
-        temperature: float = 0.5,
+        temperature: float = 0.0,
         max_tokens: Optional[int] = None,
         system_prompt: Optional[str] = None,
     ):
@@ -83,7 +83,7 @@ class LocalLLMService:
             "stream": True,
             "options": {
                 "temperature": temperature,
-                "num_predict": max_tokens if max_tokens else 1024,
+                "num_predict": max_tokens if max_tokens else 8192,  # 8192 = đủ lớn, có giới hạn
             }
         }
         

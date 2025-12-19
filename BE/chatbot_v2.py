@@ -339,7 +339,7 @@ Trả về JSON duy nhất:
 """
     
     try:
-        analysis_response = await llm_service.generate_response(analyze_prompt, temperature=0.1)
+        analysis_response = await llm_service.generate_response(analyze_prompt, temperature=0.0)
         # Parse JSON from response
         match = re.search(r'\{.*\}', analysis_response, re.DOTALL)
         if match:
@@ -503,7 +503,7 @@ LƯU Ý: KHÔNG trả lời "Có" chỉ vì tìm được data. Phải SO SÁNH 
 """
     
     try:
-        response = await llm_service.generate_response(verify_prompt, temperature=0.1)
+        response = await llm_service.generate_response(verify_prompt, temperature=0.0)
         return response.strip()
     except Exception as e:
         return f"**Dữ liệu KG tìm được:**\n" + "\n".join([f"• {line}" for line in kg_data_parts[:8]])
@@ -544,7 +544,7 @@ async def analyze_query_with_llm(llm_service, user_query: str) -> tuple:
     """
     
     # Generate response
-    response_text = await llm_service.generate_response(prompt, temperature=0.1)
+    response_text = await llm_service.generate_response(prompt, temperature=0.0)
     
     # Clean response to get JSON
     try:
@@ -649,7 +649,7 @@ async def main():
                 print(">>> KẾT LUẬN TỔNG HỢP:")
                 print(result["consensus_answer"])
             else:
-                # Normal mode - use best answer
+                # Normal mode - use full answer_question with intent-specific handling
                 answer = await service.answer_question(q)
                 print(f"\nTrả lời:\n{answer}")
                 

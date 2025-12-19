@@ -38,7 +38,7 @@ class OntologyReasoner(BaseReasoner):
     
     @property
     def supported_intents(self) -> List[str]:
-        return ["dinh_nghia", "nghia_vu", "quyen", "yes_no"]
+        return ["dinh_nghia", "nghia_vu", "quyen", "yes_no", "hanh_vi"]
     
     async def reason(
         self, 

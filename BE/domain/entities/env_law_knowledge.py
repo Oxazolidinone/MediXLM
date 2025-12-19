@@ -17,6 +17,11 @@ class KnowledgeType(str, Enum):
     GIAI_DOAN = "GiaiDoan"
     BUOC_QUY_TRINH = "BuocQuyTrinh"
     KET_QUA = "KetQua"
+    # Thêm các loại còn thiếu
+    CHE_TAI = "CheTai"
+    THU_TUC = "ThuTuc"
+    CHU_THE = "ChuThe"
+    DIEU_LUAT = "DieuLuat"
 
 
 @dataclass

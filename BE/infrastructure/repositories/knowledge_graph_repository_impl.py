@@ -166,26 +166,48 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
         
         results = []
         async with self.driver.session() as session:
-            # Map "nhà nước" to "Chính phủ" done in query parameter or python logic
-            search_subject = "Chính phủ" if subject.lower() in ["nhà nước", "nha nuoc"] else subject
-            
-            res1 = await session.run(query_doituong, {"subject": search_subject})
+            # Chỉ query DoiTuong cho nghĩa vụ tổ chức/cá nhân
+            res1 = await session.run(query_doituong, {"subject": subject})
             results.extend(await res1.data())
             
-            res2 = await session.run(query_coquan, {"subject": search_subject})
-            results.extend(await res2.data())
-            
         return results
+
+    async def get_responsibilities(self, agency: str) -> List[Dict[str, Any]]:
+        """Get responsibilities of government agencies (CoQuan)."""
+        query = """
+        MATCH (c:CoQuan)-[r:CHIU_TRACH_NHIEM]->(tn:TrachNhiem)
+        WHERE toLower(c.ten) CONTAINS toLower($agency)
+           OR ($agency IN ['Chính phủ', 'nhà nước', 'nha nuoc', 'chinh phu'] AND c.ten = 'Chính phủ')
+           OR toLower(c.ten) CONTAINS 'bộ tài nguyên' AND toLower($agency) CONTAINS 'bộ'
+        OPTIONAL MATCH (tn)-[:QUY_DINH_TAI]->(dl:DieuLuat)
+        RETURN c.ten AS co_quan,
+               tn.noi_dung AS trach_nhiem,
+               tn.ten AS ten_trach_nhiem,
+               COALESCE(dl.ten, tn.dieu_khoan, '') AS dieu_khoan
+        LIMIT 30
+        """
+        
+        async with self.driver.session() as session:
+            # Map various forms of agency names
+            search_agency = agency
+            if agency.lower() in ["nhà nước", "nha nuoc"]:
+                search_agency = "Chính phủ"
+            elif "tn&mt" in agency.lower() or "tnmt" in agency.lower():
+                search_agency = "Bộ Tài nguyên"
+            
+            result = await session.run(query, {"agency": search_agency})
+            return await result.data()
 
     async def get_rights(self, subject: str) -> List[Dict[str, Any]]:
         query = """
         MATCH (d:DoiTuong)-[r:CO_QUYEN]->(q:QuyenNghiaVu)
         WHERE toLower(d.ten) CONTAINS toLower($subject)
+        OPTIONAL MATCH (q)-[:QUY_DINH_TAI]->(dl:DieuLuat)
         RETURN d.ten AS chu_the,
                q.noi_dung AS quyen,
                q.loai AS loai_quyen,
                q.id AS doi_tuong,
-               q.dieu_khoan AS dieu_khoan
+               COALESCE(dl.ten, q.dieu_khoan, '') AS dieu_khoan
         LIMIT 15
         """
         async with self.driver.session() as session:
@@ -194,19 +216,43 @@ class KnowledgeGraphRepositoryImpl(IKnowledgeGraphRepository):
 
 
     async def get_consequences(self, action: str) -> List[Dict[str, Any]]:
-        query = """
-        MATCH (h:HanhVi)
-        WHERE toLower(h.ten) CONTAINS toLower($term)
-           OR toLower(h.noi_dung) CONTAINS toLower($term)
-        RETURN h.ten AS hanh_vi, 
-               h.noi_dung AS noi_dung_hanh_vi, 
-               h.che_tai AS che_tai, 
-               "N/A" AS dieu_khoan
-        LIMIT 10
-        """
-        async with self.driver.session() as session:
-            result = await session.run(query, {"term": action})
-            return await result.data()
+        # Check if this is a generic request for all violations
+        generic_terms = ["vi phạm", "hành vi", "các hành vi", "luật môi trường", "pháp luật"]
+        is_generic = any(term in action.lower() for term in generic_terms)
+        
+        if is_generic:
+            # Get all violation-related HanhVi nodes with legal citations via relationship
+            query = """
+            MATCH (h:HanhVi)
+            WHERE h.ten IS NOT NULL AND h.ten <> ''
+            OPTIONAL MATCH (h)-[:QUY_DINH_TAI]->(dl:DieuLuat)
+            OPTIONAL MATCH (h)-[:CO_CHE_TAI]->(ct:CheTai)
+            RETURN h.ten AS hanh_vi, 
+                   COALESCE(h.noi_dung, h.mo_ta, '') AS noi_dung_hanh_vi, 
+                   COALESCE(ct.noi_dung, h.che_tai, '') AS che_tai, 
+                   COALESCE(dl.ten, 'Luật BVMT 2020') AS dieu_khoan
+            LIMIT 30
+            """
+            async with self.driver.session() as session:
+                result = await session.run(query)
+                return await result.data()
+        else:
+            # Specific search with legal citations
+            query = """
+            MATCH (h:HanhVi)
+            WHERE toLower(h.ten) CONTAINS toLower($term)
+               OR toLower(h.noi_dung) CONTAINS toLower($term)
+            OPTIONAL MATCH (h)-[:QUY_DINH_TAI]->(dl:DieuLuat)
+            OPTIONAL MATCH (h)-[:CO_CHE_TAI]->(ct:CheTai)
+            RETURN h.ten AS hanh_vi, 
+                   COALESCE(h.noi_dung, h.mo_ta, '') AS noi_dung_hanh_vi, 
+                   COALESCE(ct.noi_dung, h.che_tai, '') AS che_tai, 
+                   COALESCE(dl.ten, 'Luật BVMT 2020') AS dieu_khoan
+            LIMIT 15
+            """
+            async with self.driver.session() as session:
+                result = await session.run(query, {"term": action})
+                return await result.data()
 
     async def get_agencies(self) -> List[EnvLawKnowledge]:
         query = """
