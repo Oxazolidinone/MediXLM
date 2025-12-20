@@ -12,6 +12,7 @@ from .rules import (
     AuthorityRule,
 )
 from infrastructure.services.ollama_service import OllamaService
+from infrastructure.services.cache_service import CacheService, get_cache_service
 
 
 class KGReasoner:
@@ -30,15 +31,22 @@ QUY TẮC BẮT BUỘC:
 
 Hãy trả lời câu hỏi dựa HOÀN TOÀN trên dữ liệu được cung cấp."""
     
-    def __init__(self, driver: AsyncDriver, ollama_service: Optional[OllamaService] = None):
+    def __init__(
+        self, 
+        driver: AsyncDriver, 
+        ollama_service: Optional[OllamaService] = None,
+        cache_service: Optional[CacheService] = None
+    ):
         """Initialize the reasoner.
         
         Args:
             driver: Neo4j async driver
             ollama_service: Optional Ollama service for LLM formatting
+            cache_service: Optional cache service for caching answers
         """
         self.driver = driver
         self.ollama = ollama_service or OllamaService()
+        self.cache = cache_service or get_cache_service()
         self.parser = IntentParser()
         
         # Initialize rules
@@ -59,6 +67,11 @@ Hãy trả lời câu hỏi dựa HOÀN TOÀN trên dữ liệu được cung c�
         Returns:
             Formatted answer string
         """
+        # Check cache first
+        cached_answer = await self.cache.get_cached_answer(question)
+        if cached_answer:
+            return cached_answer
+        
         # Parse intent and entities
         intent, entities = self.parser.parse(question)
         
@@ -74,6 +87,9 @@ Hãy trả lời câu hỏi dựa HOÀN TOÀN trên dữ liệu được cung c�
         
         # Format response with Ollama
         response = await self._format_with_llm(question, kg_data)
+        
+        # Cache the response for future queries
+        await self.cache.set_cached_answer(question, response)
         
         return response
     

@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -20,31 +20,52 @@ services:
     networks:
       - medixlm-network
     restart: unless-stopped
-    
+
+  redis:
+    image: redis:7-alpine
+    container_name: medixlm-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medixlm-network
+    restart: unless-stopped
+
   backend:
     build:
       context: ./BE
       dockerfile: Dockerfile
     container_name: medixlm-backend
     env_file:
-      - ./BE/.env  # Load environment variables from .env file
+      - ./BE/.env # Load environment variables from .env file
     environment:
       # Override Database URL for Docker network
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/medixlm
+      # Override Redis URL for Docker network
+      REDIS_URL: redis://redis:6379
     ports:
       - "8000:8000"
     volumes:
       - ./BE:/app
-      - model_cache:/root/.cache/huggingface  # Cache for HuggingFace models
+      - model_cache:/root/.cache/huggingface # Cache for HuggingFace models
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 120s  # Extended for model loading
+      start_period: 120s # Extended for model loading
     networks:
       - medixlm-network
     restart: unless-stopped
@@ -57,6 +78,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   model_cache:
     driver: local

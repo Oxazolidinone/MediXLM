@@ -44,11 +44,10 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION_NAME: str = "medical_knowledge"
     EMBEDDING_DIMENSION: int = 384
 
-
-    # Local LLM (HuggingFace models)
-    LLM_MODEL_NAME: str = "microsoft/phi-2"  # Lightweight model
+    # Local LLM (Ollama models)
+    LLM_MODEL_NAME: str = "mistral:latest"  # Use Ollama model
     LLM_MAX_TOKENS: int = 2000
-    OLLAMA_API_URL: str = "http://localhost:11434" # Force use of this
+    OLLAMA_API_URL: str = "http://localhost:11434"
     LLM_TIMEOUT: Optional[int] = None  # None = không giới hạn thời gian chờ
 
     # Local Embedding Model
